@@ -314,6 +314,11 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 
 ## Changelog
 
+**2017-02-20 v4.0.1**
+
+* Fixed an issue with the colors not displaying properly for Not Activated /  Multiple Wins Checker results from v4.0-.
+* Fixed an issue with the header from Extended SteamGifts.
+
 **2017-02-20 v4.0**
 
 * Script moved from Greasy Fork to GitHub with a major update and lots of changes / new features.
