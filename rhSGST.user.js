@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.1
+// @version 4.1.1
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -60,6 +60,9 @@
             },
             ES_R: {
                 Name: "Enable in the rest of the pages."
+            },
+            ES_RD: {
+                Name: "Show recent discussions at the top."
             }
         },
         SGPB: {
@@ -108,7 +111,10 @@
             Name: "Unsent Gifts Sender"
         },
         CT: {
-            Name: "Comment Tracker"
+            Name: "Comment Tracker",
+            CT_G: {
+                Name: "Fade out visited giveaways."
+            }
         },
         AT: {
             Name: "Accurate Timestamp"
@@ -1535,7 +1541,7 @@
         MainPagination = document.getElementsByClassName("pagination")[0];
         if (Context || MainPagination) {
             RecentDiscussions = document.getElementsByClassName("widget-container--margin-top")[0];
-            if (RecentDiscussions) {
+            if (RecentDiscussions && GM_getValue("ES_RD")) {
                 RecentDiscussions.classList.add("ESRecentDiscussions");
                 Container = Heading.parentElement;
                 Container.insertBefore(RecentDiscussions.previousElementSibling, Container.firstElementChild);
@@ -3489,7 +3495,7 @@
             Link = Matches[I].getAttribute("href");
             if (Link) {
                 Key = Link.match(/\/(giveaway|discussion|support\/ticket|trade)\/(.+?)\//);
-                if (Key && Comments[Key[2]]) {
+                if (Key && (((Key[1] == "giveaway") && GM_getValue("CT_G")) || (Key[1] != "giveaway")) && Comments[Key[2]]) {
                     Element = Matches[I].closest("div");
                     Element.style.opacity = "0.5";
                     setHoverOpacity(Element, "1", "0.5");
@@ -3544,24 +3550,40 @@
                 Matches[I].addEventListener("mouseenter", markCTRead);
                 if (Matches[I].querySelector("[data-timestamp='" + Comments[SG ? Matches[I].id : Matches[I].parentElement.id] + "']")) {
                     Matches[I].style.opacity = "0.5";
+                    setHoverOpacity(Matches[I], "1", "0.5");
                 }
-                setHoverOpacity(Matches[I], "1", "0.5");
             }
         }
 
         function markCTRead(Event) {
-            var Comment, Timestamp, CommentID;
+            var Comment, Timeout;
             Comment = Event.currentTarget;
             Comment.removeEventListener("mouseenter", markCTRead);
-            Timestamp = Comment.getElementsByClassName(SG ? "comment__actions" : "action_list")[0].firstElementChild.querySelectorAll("[data-timestamp]");
-            Timestamp = parseInt(Timestamp[Timestamp.length - 1].getAttribute("data-timestamp"));
-            Comments = GM_getValue(ID);
-            CommentID = SG ? Comment.id : Comment.parentElement.id;
-            if (Timestamp == Comments[Key][CommentID]) {
-                Comment.style.opacity = "0.5";
-            } else {
-                Comments[Key][CommentID] = Timestamp;
-                GM_setValue(ID, Comments);
+            Timeout = setTimeout(function() {
+                var Timestamp, CommentID;
+                clearTimeout(Timeout);
+                Timeout = null;
+                Timestamp = Comment.getElementsByClassName(SG ? "comment__actions" : "action_list")[0].firstElementChild.querySelectorAll("[data-timestamp]");
+                Timestamp = parseInt(Timestamp[Timestamp.length - 1].getAttribute("data-timestamp"));
+                Comments = GM_getValue(ID);
+                CommentID = SG ? Comment.id : Comment.parentElement.id;
+                if (Timestamp == Comments[Key][CommentID]) {
+                    Comment.style.opacity = "0.5";
+                } else {
+                    Comments[Key][CommentID] = Timestamp;
+                    GM_setValue(ID, Comments);
+                }
+                setHoverOpacity(Comment, "1", "0.5");
+            }, 1000);
+            Comment.addEventListener("mouseleave", clearCTTimeout);
+
+            function clearCTTimeout() {
+                Comment.removeEventListener("mouseleave", clearCTTimeout);
+                if (Timeout) {
+                    clearTimeout(Timeout);
+                    Timeout = null;
+                    Comment.addEventListener("mouseenter", markCTRead);
+                }
             }
         }
     }
