@@ -18,6 +18,8 @@
 // @connect steamcommunity.com
 // @require https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js
 // @require https://greasyfork.org/scripts/26575-bpopup/code/bPopup.js?version=169515
+// @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
+//@downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @run-at document-end
 // ==/UserScript==
 
