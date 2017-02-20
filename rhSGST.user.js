@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.0
+// @version 4.0.1
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -2924,7 +2924,7 @@
     function highlightNAMWCUser(User, Matches) {
         var Name, Title, I, N;
         if (User.NAMWC && User.NAMWC.Results) {
-            Name = (User.NAMWC.Results.Activated && User.NAMWC.Results.NotMultiple) ? "NAMWCPositive" : "NAMWCNegative";
+            Name = (User.NAMWC.Results.None || (User.NAMWC.Results.Activated && User.NAMWC.Results.NotMultiple)) ? "NAMWCPositive" : "NAMWCNegative";
             Title = User.Username + " has " + User.NAMWC.Results.NotActivated + " not activated wins and " + User.NAMWC.Results.Multiple + " multiple wins.";
             for (I = 0, N = Matches.length; I < N; ++I) {
                 Matches[I].classList.add(Name);
@@ -11553,7 +11553,7 @@
             "    position: fixed;" +
             "    top: 0;" +
             "    width: 100%;" +
-            "    z-index: 999;" +
+            "    z-index: 999 !important;" +
             "}" +
             ".FEHeading {" +
             "    position: fixed;" +
