@@ -314,6 +314,10 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 
 ## Changelog
 
+**2017-02-20 v4.0.3**
+
+* Fixed an issue that prevented Not Activated / Multiple Wins Checker results from loading in the settings menu.
+
 **2017-02-20 v4.0.2**
 
 * Fixed an issue that was preventing the script from running for some people.
