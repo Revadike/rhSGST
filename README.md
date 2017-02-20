@@ -314,6 +314,10 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 
 ## Changelog
 
+**2017-02-20 v4.0.2**
+
+* Fixed an issue that was preventing the script from running for some people.
+
 **2017-02-20 v4.0.1**
 
 * Fixed an issue with the colors not displaying properly for Not Activated /  Multiple Wins Checker results from v4.0-.
