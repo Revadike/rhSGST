@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.0.3
+// @version 4.1
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -103,6 +103,9 @@
         },
         AP: {
             Name: "Avatar Popout"
+        },
+        UGS: {
+            Name: "Unsent Gifts Sender"
         },
         CT: {
             Name: "Comment Tracker"
@@ -204,7 +207,7 @@
                 I = Matches.length - 1;
                 while ((I >= 0) && (Matches[I] != Element)) {
                     --I;
-                };
+                }
             } while ((I < 0) && (Element = Element.parentElement));
             return Element;
         };
@@ -412,6 +415,10 @@
             Check: GM_getValue("ES"),
             Name: "ESPanel",
             Callback: addESPanel
+        }, {
+            Check: GM_getValue("UGS") && Path.match(/\/giveaways\/created/),
+            Name: "UGSButton",
+            Callback: addUGSButton
         }, {
             Check: GM_getValue("NAMWC") && SG && Object.keys(CurrentUsers).length && Path.match(/\/winners/),
             Name: "NAMWCButton",
@@ -3221,6 +3228,253 @@
                         APBox.reposition(APAvatar);
                     });
                 }
+            });
+        }
+    }
+
+    // Unsent Gifts Sender
+
+    function addUGSButton(Context) {
+        var Popup, UGS, UGSButton;
+        Popup = createPopup();
+        Popup.Icon.classList.add("fa-gift");
+        Popup.Title.textContent = "Send unsent gifts:";
+        UGS = {};
+        createOptions(Popup.Options, UGS, [{
+            Check: function() {
+                return true;
+            },
+            Description: "Only send to users with 0 not activated / multiple wins.",
+            Title: "This option will retrieve the results in real time, without using caches.",
+            Name: "SendActivatedNotMultiple",
+            Key: "SANM",
+            ID: "UGS_SANM"
+        }, {
+            Check: function() {
+                return true;
+            },
+            Description: "Only send to users who are whitelisted.",
+            Title: "This option will use your whitelist cache.\nMake sure to sync it through the settings menu if you whitelisted a new user since the last sync.\n" + (
+                "Whitelisted users get a pass for not activated / multiple wins."),
+            Name: "SendWhitelist",
+            Key: "SW",
+            ID: "UGS_SW"
+        }]);
+        Context.insertAdjacentHTML(
+            "afterBegin",
+            "<a class=\"UGSButton\" title=\"Send unsent gifts.\">" +
+            "    <i class=\"fa fa-gift\"></i>" +
+            "    <i class=\"fa fa-send\"></i>" +
+            "</a>"
+        );
+        UGSButton = Context.firstElementChild;
+        createButton(Popup.Button, "fa-send", "Send", "fa-times-circle", "Cancel", function(Callback) {
+            var Match;
+            UGSButton.classList.add("rhBusy");
+            UGS.Progress.innerHTML = UGS.OverallProgress.innerHTML = "";
+            UGS.Sent.classList.add("rhHidden");
+            UGS.Unsent.classList.add("rhHidden");
+            UGS.SentCount.textContent = UGS.UnsentCount.textContent = "0";
+            UGS.SentUsers.innerHTML = UGS.UnsentUsers.innerHTML = "";
+            UGS.Canceled = false;
+            UGS.Giveaways = {};
+            Match = Location.match(/page=(\d+)/);
+            getUGSGiveaways(UGS, 1, Match ? parseInt(Match[1]) : 1, function() {
+                var Keys;
+                Keys = Object.keys(UGS.Giveaways);
+                if (Keys.length) {
+                    getUGSWinners(UGS, 0, Keys.length, Keys, function() {
+                        UGSButton.classList.remove("rhBusy");
+                        UGS.Progress.innerHTML = UGS.OverallProgress.innerHTML = "";
+                        Callback();
+                    });
+                } else {
+                    UGSButton.classList.remove("rhBusy");
+                    UGS.Progress.innerHTML =
+                        "<i class=\"fa fa-check-circle giveaway__column--positive\"></i> " +
+                        "<span>You have no unsent gifts.</span>";
+                    UGS.OverallProgress.innerHTML = "";
+                    Callback();
+                }
+            });
+        }, function() {
+            clearInterval(UGS.Request);
+            clearInterval(UGS.Save);
+            UGS.Canceled = true;
+            setTimeout(function() {
+                UGS.Progress.innerHTML = UGS.OverallProgress.innerHTML = "";
+            }, 500);
+            UGSButton.classList.remove("rhBusy");
+        });
+        UGS.Progress = Popup.Progress;
+        UGS.OverallProgress = Popup.OverallProgress;
+        createResults(Popup.Results, UGS, [{
+            Icon: "<i class=\"fa fa-check-circle giveaway__column--positive\"></i> ",
+            Description: "Sent gifts to ",
+            Key: "Sent"
+        }, {
+            Icon: "<i class=\"fa fa-times-circle giveaway__column--negative\"></i> ",
+            Description: "Did not send gifts to ",
+            Key: "Unsent"
+        }]);
+        UGSButton.addEventListener("click", function() {
+            UGS.Popup = Popup.popUp();
+        });
+    }
+
+    function getUGSGiveaways(UGS, NextPage, CurrentPage, Callback, Context) {
+        var Matches, N, I, Pagination;
+        if (Context) {
+            Matches = Context.getElementsByClassName("fa icon-red fa-warning");
+            N = Matches.length;
+            if (N > 0) {
+                for (I = 0; I < N; ++I) {
+                    UGS.Giveaways[Matches[I].closest(".table__row-inner-wrap").getElementsByClassName("table__column__heading")[0].textContent] =
+                        Matches[I].nextElementSibling.getAttribute("href");
+                }
+                Pagination = Context.getElementsByClassName("pagination__navigation")[0];
+                if (Pagination && !Pagination.lastElementChild.classList.contains("is-selected")) {
+                    getUGSGiveaways(UGS, NextPage, CurrentPage, Callback);
+                } else {
+                    Callback();
+                }
+            } else {
+                Callback();
+            }
+        } else if (!UGS.Canceled) {
+            UGS.Progress.innerHTML =
+                "<i class=\"fa fa-circle-o-notch\"></i> " +
+                "<span>Retrieving unsent giveaways (page " + NextPage + ")...</span>";
+            if (CurrentPage != NextPage) {
+                queueRequest(UGS, null, "/giveaways/created/search?page=" + NextPage, function(Response) {
+                    getUGSGiveaways(UGS, ++NextPage, CurrentPage, Callback, parseHTML(Response.responseText));
+                });
+            } else {
+                getUGSGiveaways(UGS, ++NextPage, CurrentPage, Callback, document);
+            }
+        }
+    }
+
+    function getUGSWinners(UGS, I, N, Keys, Callback) {
+        if (!UGS.Canceled) {
+            UGS.OverallProgress.textContent = I + " of " + N + " giveaways retrieved...";
+            if (I < N) {
+                UGS.Progress.innerHTML =
+                    "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
+                    "<span>Retrieving winners...</span>";
+                queueRequest(UGS, null, UGS.Giveaways[Keys[I]], function(Response) {
+                    var ResponseHTML, Matches, Winners, J, NumMatches, WinnersKeys;
+                    ResponseHTML = parseHTML(Response.responseText);
+                    if (!UGS.XSRFToken) {
+                        UGS.XSRFToken = ResponseHTML.querySelector("[name='xsrf_token']").value;
+                    }
+                    Matches = ResponseHTML.getElementsByClassName("table__row-inner-wrap");
+                    Winners = {};
+                    for (J = 0, NumMatches = Matches.length; J < NumMatches; ++J) {
+                        Winners[Matches[J].getElementsByClassName("table__column__heading")[0].textContent] = Matches[J].querySelector("[name='winner_id']").value;
+                    }
+                    if (NumMatches < 25) {
+                        WinnersKeys = sortArray(Object.keys(Winners));
+                        sendUGSGifts(UGS, 0, WinnersKeys.length, Keys[I], WinnersKeys, Winners, function() {
+                            getUGSWinners(UGS, ++I, N, Keys, Callback);
+                        });
+                    } else {
+                        queueRequest(UGS, null, UGS.Giveaways[Keys[I]] + "/search?page=2", function(Response) {
+                            Matches = parseHTML(Response.responseText).getElementsByClassName("table__row-inner-wrap");
+                            for (J = 0, NumMatches = Matches.length; J < NumMatches; ++J) {
+                                Winners[Matches[J].getElementsByClassName("table__column__heading")[0].textContent] = Matches[J].querySelector("[name='winner_id']").value;
+                            }
+                            WinnersKeys = sortArray(Object.keys(Winners));
+                            sendUGSGifts(UGS, 0, WinnersKeys.length, Keys[I], WinnersKeys, Winners, function() {
+                                getUGSWinners(UGS, ++I, N, Keys, Callback);
+                            });
+                        });
+                    }
+                });
+            } else {
+                Callback();
+            }
+        }
+    }
+
+    function sendUGSGifts(UGS, I, N, Key, Keys, Winners, Callback) {
+        var SANM, SW, User;
+        if (!UGS.Canceled) {
+            UGS.OverallProgress.innerHTML = I + " of " + N + " winners checked...";
+            if (I < N) {
+                UGS.Progress.innerHTML =
+                    "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
+                    "<span>Sending " + Key + " to " + Keys[I] + "...</span>";
+                SANM = UGS.SANM.checked;
+                SW = UGS.SW.checked;
+                if (SANM || SW) {
+                    User = {
+                        Username: Keys[I]
+                    };
+                    queueSave(UGS, User, function() {
+                        var SavedUser;
+                        SavedUser = getUser(User);
+                        if (SANM) {
+                            if (SW && SavedUser.Whitelisted) {
+                                sendUGSGift(UGS, Winners, Keys, I, Key, N, Callback);
+                            } else {
+                                User.NAMWC = SavedUser.NAMWC;
+                                updateNAMWCResults(User, UGS, function() {
+                                    if (!User.NAMWC) {
+                                        User.NAMWC = {
+                                            Results: {}
+                                        };
+                                    }
+                                    checkNAMWCNotActivated(UGS, User, function() {
+                                        checkNAMWCMultiple(UGS, User, function() {
+                                            queueSave(UGS, User, function() {
+                                                if (User.NAMWC.Results.Activated && User.NAMWC.Results.NotMultiple) {
+                                                    sendUGSGift(UGS, Winners, Keys, I, Key, N, Callback);
+                                                } else {
+                                                    UGS.Unsent.classList.remove("rhHidden");
+                                                    UGS.UnsentCount.textContent = parseInt(UGS.UnsentCount.textContent) + 1;
+                                                    UGS.UnsentUsers.insertAdjacentHTML(
+                                                        "beforeEnd",
+                                                        "<span><a href=\"/user/" + Keys[I] + "\">" + Keys[I] + "</a> (<a href=\"" + UGS.Giveaways[Key] + "\">" + Key + "</a>)</span>"
+                                                    );
+                                                    sendUGSGifts(UGS, ++I, N, Key, Keys, Winners, Callback);
+                                                }
+                                            });
+                                        });
+                                    });
+                                });
+                            }
+                        } else if (SavedUser.Whitelisted) {
+                            sendUGSGift(UGS, Winners, Keys, I, Key, N, Callback);
+                        } else {
+                            UGS.Unsent.classList.remove("rhHidden");
+                            UGS.UnsentCount.textContent = parseInt(UGS.UnsentCount.textContent) + 1;
+                            UGS.UnsentUsers.insertAdjacentHTML(
+                                "beforeEnd",
+                                "<span><a href=\"/user/" + Keys[I] + "\">" + Keys[I] + "</a> (<a href=\"" + UGS.Giveaways[Key] + "\">" + Key + "</a>)</span>"
+                            );
+                            sendUGSGifts(UGS, ++I, N, Key, Keys, Winners, Callback);
+                        }
+                    });
+                } else {
+                    sendUGSGift(UGS, Winners, Keys, I, Key, N, Callback);
+                }
+            } else {
+                Callback();
+            }
+        }
+    }
+
+    function sendUGSGift(UGS, Winners, Keys, I, Key, N, Callback) {
+        if (!UGS.Canceled) {
+            queueRequest(UGS, "xsrf_token=" + UGS.XSRFToken + "&do=sent_feedback&action=1&winner_id=" + Winners[Keys[I]], "/ajax.php", function(Response) {
+                UGS.Sent.classList.remove("rhHidden");
+                UGS.SentCount.textContent = parseInt(UGS.SentCount.textContent) + 1;
+                UGS.SentUsers.insertAdjacentHTML(
+                    "beforeEnd",
+                    "<span><a href=\"/user/" + Keys[I] + "\">" + Keys[I] + "</a> (<a href=\"" + UGS.Giveaways[Key] + "\">" + Key + "</a>)</span>"
+                );
+                sendUGSGifts(UGS, ++I, N, Key, Keys, Winners, Callback);
             });
         }
     }
@@ -11603,8 +11857,8 @@
             "    height: 14px;" +
             "    width: 14px;" +
             "}" +
-            ".ESPanel .pagination__navigation >*, .ESPanel .pagination_navigation >*, .ESRefresh, .ESPause, .UHButton, .PUNButton, .WBCButton, .NAMWCButton, .NRFButton, .CTButton, " +
-            ".MCBPButton, .MPPButton, .ASButton {" +
+            ".ESPanel .pagination__navigation >*, .ESPanel .pagination_navigation >*, .ESRefresh, .ESPause, .UHButton, .PUNButton, .WBCButton, .NAMWCButton, .NRFButton, .UGSButton," +
+            ".CTButton, .MCBPButton, .MPPButton, .ASButton {" +
             "    cursor: pointer;" +
             "    display: inline-block;" +
             "}" +
