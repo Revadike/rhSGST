@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.0.2
+// @version 4.0.3
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -2814,7 +2814,7 @@
 
     function updateNAMWCResults(User, NAMWC, Callback) {
         var Results;
-        if (User.NAMWC && User.NAMWC.Results && User.NAMWC.Results.None) {
+        if (User.NAMWC && User.NAMWC.Results && (typeof User.NAMWC.Results.None != "undefined")) {
             Results = User.NAMWC.Results;
             User.NAMWC.Results = {
                 Activated: Results.None,
