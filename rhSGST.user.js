@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.0.1
+// @version 4.0.2
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -247,7 +247,7 @@
         };
         rhSGST = GM_getValue("rhSGST");
         for (Key in DefaultValues) {
-            if ((typeof GM_getValue(Key) == "undefined")) {
+            if (typeof GM_getValue(Key) == "undefined") {
                 if (rhSGST && rhSGST[Key]) {
                     GM_setValue(Key, rhSGST[Key]);
                 } else {
@@ -262,7 +262,7 @@
 
     function transferSettings(Key, rhSGST, Feature) {
         if (typeof GM_getValue(Key) == "undefined") {
-            if (typeof rhSGST[Key] != "undefined") {
+            if (rhSGST && (typeof rhSGST[Key] != "undefined")) {
                 GM_setValue(Key, rhSGST[Key]);
             } else {
                 GM_setValue(Key, true);
