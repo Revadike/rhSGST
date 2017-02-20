@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.1.1
+// @version 4.1.2
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -532,30 +532,21 @@
 
     function queueRequest(Element, Data, URL, Callback) {
         var CurrentDate;
-        CurrentDate = new Date().getTime();
-        if ((CurrentDate - GM_getValue("LastRequest")) > 300000) {
-            GM_setValue("LastRequest", CurrentDate);
-            makeRequest(Data, URL, Element.Progress, function(Response) {
-                GM_setValue("LastRequest", 0);
-                Callback(Response);
-            });
-        } else {
-            Element.Request = setInterval(function() {
-                CurrentDate = new Date().getTime();
-                if ((CurrentDate - GM_getValue("LastRequest")) > 300000) {
-                    clearInterval(Element.Request);
-                    GM_setValue("LastRequest", CurrentDate);
-                    makeRequest(Data, URL, Element.Progress, function(Response) {
-                        GM_setValue("LastRequest", 0);
-                        Callback(Response);
-                    });
-                } else {
-                    Element.Progress.innerHTML =
-                        "<i class=\"fa fa-clock-o\"></i> " +
-                        "<span>Waiting for a free request slot...</span>";
-                }
-            }, 500);
-        }
+        Element.Request = setInterval(function() {
+            CurrentDate = new Date().getTime();
+            if ((CurrentDate - GM_getValue("LastRequest")) > 300000) {
+                clearInterval(Element.Request);
+                GM_setValue("LastRequest", CurrentDate);
+                makeRequest(Data, URL, Element.Progress, function(Response) {
+                    GM_setValue("LastRequest", 0);
+                    Callback(Response);
+                });
+            } else {
+                Element.Progress.innerHTML =
+                    "<i class=\"fa fa-clock-o\"></i> " +
+                    "<span>Waiting for a free request slot...</span>";
+            }
+        }, 500);
     }
 
     function makeRequest(Data, URL, Context, Callback) {
