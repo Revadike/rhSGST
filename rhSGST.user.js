@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.1.5
+// @version 4.1.6
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -3486,7 +3486,7 @@
     // Comment Tracker
 
     function checkCTVisited(Matches) {
-        var ID, Comments, I, N, Link, Match, Type, Key, Element, CommentsCount, Count;
+        var ID, Comments, I, N, Link, Match, Type, Key, Element, CommentsCount, Count, Read;
         ID = "Comments" + (SG ? "" : "_ST");
         Comments = GM_getValue(ID);
         for (I = 0, N = Matches.length; I < N; ++I) {
@@ -3506,16 +3506,13 @@
                     if (!Comments[Key]) {
                         Comments[Key] = {};
                     }
-                    if (!Comments[Key].Count || (Comments[Key].Count < Count) || ((Object.keys(Comments[Key]).length - 3) < Count)) {
-                        if (!Comments[Key].Count) {
-                            Comments[Key].Count = 0;
-                        }
-                        if (Comments[Key].Count < Count) {
-                            CommentsCount.insertAdjacentText("beforeEnd", " (+" + (Count - Comments[Key].Count) + ")");
-                        }
-                        Comments[Key].Count = Count;
-                        GM_setValue("Comments", Comments);
-                        Comments = GM_getValue(ID);
+                    delete Comments[Key].Count;
+                    Read = Object.keys(Comments[Key]).length - 2;
+                    if (Read < 0) {
+                        Read = 0;
+                    }
+                    if (Read < Count) {
+                        CommentsCount.insertAdjacentText("beforeEnd", " (+" + (Count - Read) + ")");
                         CommentsCount.insertAdjacentHTML(
                             "afterEnd",
                             "<a class=\"CTButton\" title=\"Mark all comments as read.\">" +
