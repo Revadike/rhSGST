@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.1.6
+// @version 4.2
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -112,6 +112,9 @@
         },
         UGS: {
             Name: "Unsent Gifts Sender"
+        },
+        AGS: {
+            Name: "Advanced Giveaway Search"
         },
         CT: {
             Name: "Comment Tracker",
@@ -304,6 +307,8 @@
             if (CommentBox) {
                 addDEDButton(CommentBox);
             }
+        } else if (GM_getValue("AGS") && Path.match(/^\/($|giveaways(?!\/(wishlist|created|entered|won)))/)) {
+            addAGSPanel();
         }
         Users = {};
         Games = {};
@@ -466,7 +471,7 @@
             Callback: checkCTVisited,
             All: true
         }, {
-            Check: GM_getValue("AT") && ((GM_getValue("AT_G") && Path.match(/^\/($|giveaways)/)) || (!GM_getValue("AT_G") && !Path.match(/^\/($|giveaways)/))),
+            Check: GM_getValue("AT") && ((GM_getValue("AT_G") && Path.match(/^\/($|giveaways)/)) || (!Path.match(/^\/($|giveaways)/))),
             Query: "[data-timestamp]",
             Callback: setATTimestamp
         }, {
@@ -3480,6 +3485,81 @@
                 );
                 sendUGSGifts(UGS, ++I, N, Key, Keys, Winners, Callback);
             });
+        }
+    }
+
+    // Advanced Giveaway Search
+
+    function addAGSPanel() {
+        var Context, Input, Match, AGSPanel, AGS, Level, I, RegionRestricted;
+        Context = document.getElementsByClassName("sidebar__search-container")[0];
+        Context.firstElementChild.remove();
+        Context.insertAdjacentHTML("afterBegin", "<input class=\"sidebar__search-input\" placeholder=\"Search...\" type=\"text\"/>");
+        Input = Context.firstElementChild;
+        Match = Location.match(/q=(.*?)(&.+?)?$/);
+        if (Match) {
+            Input.value = Match[1];
+        }
+        Context.insertAdjacentHTML("afterEnd", "<div class=\"AGSPanel\"></div>");
+        AGSPanel = Context.nextElementSibling;
+        AGS = {};
+        Level = "<select>";
+        for (I = 0; I <= 10; ++I) {
+            Level += "<option>" + I + "</option>";
+        }
+        Level += "</select>";
+        createAGSFilters(AGSPanel, AGS, [{
+            Title: "Level",
+            HTML: Level,
+            Key: "level",
+        }, {
+            Title: "Entries",
+            HTML: "<input type=\"text\"/>",
+            Key: "entry",
+        }, {
+            Title: "Copies",
+            HTML: "<input type=\"text\"/>",
+            Key: "copy"
+        }]);
+        AGS.level_max.selectedIndex = 10;
+        AGSPanel.insertAdjacentHTML(
+            "beforeEnd",
+            "<div>" +
+            "    <span></span>" +
+            "    <span>Region Restricted</span>" +
+            "</div>"
+        );
+        RegionRestricted = createCheckbox(AGSPanel.lastElementChild.firstElementChild);
+        Context.addEventListener("keydown", function(Event) {
+            var Type, URL, Key;
+            if (Event.key == "Enter") {
+                Event.preventDefault();
+                Type = Location.match(/(type=(.+?))(&.+?)?$/);
+                URL = "https://www.steamgifts.com/giveaways/search?q=" + Input.value + (Type ? ("&" + Type[1]) : "");
+                for (Key in AGS) {
+                    if (AGS[Key].value) {
+                        URL += "&" + Key + "=" + AGS[Key].value;
+                    }
+                }
+                URL += RegionRestricted.checked ? "&region_restricted=true" : "";
+                window.location.href = URL;
+            }
+        });
+    }
+
+    function createAGSFilters(AGSPanel, AGS, Filters) {
+        var I, N, AGSFilter;
+        for (I = 0, N = Filters.length; I < N; ++I) {
+            AGSPanel.insertAdjacentHTML(
+                "beforeEnd",
+                "<div class=\"AGSFilter\">" +
+                "    <span>Min " + Filters[I].Title + " " + Filters[I].HTML + "</span>" +
+                "    <span>Max " + Filters[I].Title + " " + Filters[I].HTML + "</span>" +
+                "</div>"
+            );
+            AGSFilter = AGSPanel.lastElementChild;
+            AGS[Filters[I].Key + "_min"] = AGSFilter.firstElementChild.firstElementChild;
+            AGS[Filters[I].Key + "_max"] = AGSFilter.lastElementChild.firstElementChild;
         }
     }
 
@@ -12011,6 +12091,22 @@
             "}" +
             ".APBox .featured__table__row {" +
             "    padding: 2px;" +
+            "}" +
+            ".AGSPanel {" +
+            "    margin: 0 0 15px 0;" +
+            "}" +
+            ".AGSFilter {" +
+            "    display: flex;" +
+            "}" +
+            ".AGSFilter >* {" +
+            "    display: inline-flex;" +
+            "    justify-content: space-between;" +
+            "    margin: 5px;" +
+            "    width: 150px;" +
+            "}" +
+            ".AGSPanel input, .AGSPanel select {" +
+            "    padding: 0 5px;" +
+            "    width: 50px;" +
             "}" +
             ".CTButton {" +
             "    cursor: pointer;" +
