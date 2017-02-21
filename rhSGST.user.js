@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.1.4
+// @version 4.1.5
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -93,7 +93,10 @@
             }
         },
         RWSCVL: {
-            Name: "Real Won / Sent CV Links"
+            Name: "Real Won / Sent CV Links",
+            RWSCVL_RO: {
+                Name: "Reverse order (from new to old)."
+            }
         },
         NAMWC: {
             Name: "Not Activated / Multiple Wins Checker",
@@ -2603,7 +2606,8 @@
         for (I = 0, N = Matches.length; I < N; ++I) {
             Match = Matches[I].textContent.match(/Gifts (Won|Sent)/);
             if (Match) {
-                Matches[I].innerHTML = "<a class=\"RWSCVLLink\" href=\"http://www.sgtools.info/" + Match[1].toLowerCase() + "/" + Username + "\" target=\"_blank\">" + Match[0] + "</a>";
+                Matches[I].innerHTML = "<a class=\"RWSCVLLink\" href=\"http://www.sgtools.info/" + Match[1].toLowerCase() + "/" + Username + (GM_getValue("RWSCVL_RO") ? "/newestfirst" : "") +
+                    "\" target=\"_blank\">" + Match[0] + "</a>";
             }
         }
     }
