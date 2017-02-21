@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.1.3
+// @version 4.1.4
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -117,7 +117,10 @@
             }
         },
         AT: {
-            Name: "Accurate Timestamp"
+            Name: "Accurate Timestamp",
+            AT_G: {
+                Name: "Enable in the main giveaways pages."
+            }
         },
         CFH: {
             Name: "Comment Formatting Helper",
@@ -460,7 +463,7 @@
             Callback: checkCTVisited,
             All: true
         }, {
-            Check: GM_getValue("AT"),
+            Check: GM_getValue("AT") && ((GM_getValue("AT_G") && Path.match(/^\/($|giveaways)/)) || (!GM_getValue("AT_G") && !Path.match(/^\/($|giveaways)/))),
             Query: "[data-timestamp]",
             Callback: setATTimestamp
         }, {
@@ -1219,7 +1222,7 @@
             URL: "https://github.com/revilheart/rhSGST"
         }, {
             Title: "Update",
-            URL: "https://github.com/revilheart/rhSGST/rhSGST.user.js"
+            URL: "https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js"
         }]));
         SMButton = Sidebar.getElementsByClassName("SMButton")[0];
         SMButton.addEventListener("click", function() {
@@ -3479,18 +3482,84 @@
     // Comment Tracker
 
     function checkCTVisited(Matches) {
-        var I, N, Link, Key, Element;
+        var ID, Comments, I, N, Link, Match, Type, Key, Element, CommentsCount, Count;
+        ID = "Comments" + (SG ? "" : "_ST");
+        Comments = GM_getValue(ID);
         for (I = 0, N = Matches.length; I < N; ++I) {
             Link = Matches[I].getAttribute("href");
             if (Link) {
-                Key = Link.match(/\/(giveaway|discussion|support\/ticket|trade)\/(.+?)\//);
-                if (Key && (((Key[1] == "giveaway") && GM_getValue("CT_G")) || (Key[1] != "giveaway")) && GM_getValue("Comments" + (SG ? "" : "_ST"))[Key[2]]) {
+                Match = Link.match(/\/(giveaway|discussion|support\/ticket|trade)\/(.+?)\//);
+                Type = Match[1];
+                Key = Match[2];
+                if (Match && (((Type == "giveaway") && GM_getValue("CT_G")) || (Type != "giveaway")) && Comments[Key] && Comments[Key].Visited) {
                     Element = Matches[I].closest("div");
                     Element.style.opacity = "0.5";
                     setHoverOpacity(Element, "1", "0.5");
                 }
+                if (Type == "discussion") {
+                    CommentsCount = Matches[I].closest(".table__column--width-fill").nextElementSibling.firstElementChild;
+                    Count = parseInt(CommentsCount.textContent.replace(/,/g, ""));
+                    if (!Comments[Key]) {
+                        Comments[Key] = {};
+                    }
+                    if (!Comments[Key].Count || (Comments[Key].Count < Count) || ((Object.keys(Comments[Key]).length - 3) < Count)) {
+                        if (!Comments[Key].Count) {
+                            Comments[Key].Count = 0;
+                        }
+                        if (Comments[Key].Count < Count) {
+                            CommentsCount.insertAdjacentText("beforeEnd", " (+" + (Count - Comments[Key].Count) + ")");
+                        }
+                        Comments[Key].Count = Count;
+                        GM_setValue("Comments", Comments);
+                        Comments = GM_getValue(ID);
+                        CommentsCount.insertAdjacentHTML(
+                            "afterEnd",
+                            "<a class=\"CTButton\" title=\"Mark all comments as read.\">" +
+                            "    <i class=\"fa fa-eye\"></i>" +
+                            "</a>"
+                        );
+                        setCTDiscussionRead(CommentsCount.nextElementSibling, CommentsCount.href, Key);
+                    }
+                }
             }
         }
+    }
+
+    function setCTDiscussionRead(CTButton, URL, Key) {
+        CTButton.addEventListener("click", function() {
+            CTButton.innerHTML = " <i class=\"fa fa-circle-o-notch fa-spin\"></i>";
+            markCTDiscussionRead({
+                Progress: CTButton
+            }, URL + "/search?page=", 1, Key, function() {
+                CTButton.remove();
+            });
+        });
+    }
+
+    function markCTDiscussionRead(CT, URL, NextPage, Key, Callback) {
+        queueRequest(CT, null, URL + NextPage, function(Response) {
+            var ResponseHTML, Matches, I, N, Timestamp, Comments, Pagination;
+            ResponseHTML = parseHTML(Response.responseText);
+            Matches = ResponseHTML.getElementsByClassName("comment__summary");
+            for (I = 0, N = Matches.length; I < N; ++I) {
+                if (!Matches[I].closest(".comment--submit")) {
+                    Timestamp = Matches[I].getElementsByClassName("comment__actions")[0].firstElementChild.querySelectorAll("[data-timestamp]");
+                    Timestamp = parseInt(Timestamp[Timestamp.length - 1].getAttribute("data-timestamp"));
+                    Comments = GM_getValue("Comments");
+                    if (!Comments[Key].Visited) {
+                        Comments[Key].Visited = true;
+                    }
+                    Comments[Key][Matches[I].id] = Timestamp;
+                    GM_setValue("Comments", Comments);
+                }
+            }
+            Pagination = ResponseHTML.getElementsByClassName("pagination__navigation")[0];
+            if (Matches.length && Pagination && !Pagination.lastElementChild.classList.contains("is-selected")) {
+                markCTDiscussionRead(CT, URL, ++NextPage, Key, Callback);
+            } else {
+                Callback();
+            }
+        });
     }
 
     function addCTPanel(Context) {
@@ -3538,7 +3607,13 @@
         Comments = GM_getValue(ID);
         Key = Path.match(/^\/(giveaway(?!.+(entries|winners))|discussion|support\/ticket|trade)\/(.+?)\//)[3];
         if (!Comments[Key]) {
-            Comments[Key] = {};
+            Comments[Key] = {
+                Visited: true
+            };
+            GM_setValue(ID, Comments);
+        }
+        if (!Comments[Key].Visited) {
+            Comments[Key].Visited = true;
             GM_setValue(ID, Comments);
         }
         Comments = Comments[Key];
@@ -11936,8 +12011,10 @@
             ".APBox .featured__table__row {" +
             "    padding: 2px;" +
             "}" +
-            ".comment__actions .CTButton {" +
+            ".CTButton {" +
             "    cursor: pointer;" +
+            "}" +
+            ".comment__actions .CTButton {" +
             "    margin: 0 0 0 10px;" +
             "}" +
             ".comment__actions >:first-child + .CTButton {" +
