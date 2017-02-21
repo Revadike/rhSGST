@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.1.2
+// @version 4.1.3
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -339,7 +339,7 @@
     }
 
     function loadEndlessFeatures(Context) {
-        var Matches, CurrentUsers, I, N, UserID, Match, Icon, Game, Title, CurrentGames, SavedUsers, SavedGames;
+        var Matches, CurrentUsers, I, N, UserID, Match, SteamLink, Game, Title, CurrentGames, SavedUsers, SavedGames;
         Matches = Context.querySelectorAll("a[href*='/user/']");
         CurrentUsers = {};
         for (I = 0, N = Matches.length; I < N; ++I) {
@@ -358,13 +358,13 @@
                 }
             }
         }
-        Matches = Context.querySelectorAll(".giveaway__heading, .table__column__heading");
+        Matches = Context.querySelectorAll(Path.match(/^\/giveaway\//) ? ".featured__heading" : ".giveaway__heading, .table__column__heading");
         CurrentGames = {};
         for (I = 0, N = Matches.length; I < N; ++I) {
             Match = Matches[I];
-            Icon = Match.getElementsByClassName("giveaway__icon")[0];
-            if (Icon) {
-                Game = Icon.getAttribute("href").match(/\d+/)[0];
+            SteamLink = Match.querySelector("a[href*='steam']");
+            if (SteamLink) {
+                Game = SteamLink.getAttribute("href").match(/\d+/)[0];
                 Title = Match.firstElementChild.textContent;
             } else if (!Match.classList.contains("giveaway__heading")) {
                 Title = Match.textContent;
@@ -435,8 +435,8 @@
             Callback: addWBCButton
         }, {
             Check: GM_getValue("CT") && Path.match(/^\/(giveaway(?!.+(entries|winners))|discussion|support\/ticket|trade)\//),
-            Name: "CTButton",
-            Callback: addCTButton
+            Name: "CTPanel",
+            Callback: addCTPanel
         }, {
             Check: GM_getValue("MCBP") && Path.match(/^\/(giveaway(?!.+(entries|winners))|discussion|support\/ticket|trade)\//),
             Name: "MCBPButton",
@@ -460,11 +460,6 @@
             Callback: checkCTVisited,
             All: true
         }, {
-            Check: GM_getValue("CT") && Path.match(/^\/(giveaway(?!.+(entries|winners))|discussion|support\/ticket|trade)\//),
-            Query: ".comment__summary, .comment_inner",
-            Callback: setCTComment,
-            All: true
-        }, {
             Check: GM_getValue("AT"),
             Query: "[data-timestamp]",
             Callback: setATTimestamp
@@ -484,6 +479,11 @@
             Check: GM_getValue("RML"),
             Query: SG ? ".comment__children" : ".comment_children",
             Callback: setRMLLink
+        }, {
+            Check: GM_getValue("CT") && Path.match(/^\/(giveaway(?!.+(entries|winners))|discussion|support\/ticket|trade)\//),
+            Query: ".comment__summary, .comment_inner",
+            Callback: setCTComment,
+            All: true
         }]);
     }
 
@@ -3479,14 +3479,12 @@
     // Comment Tracker
 
     function checkCTVisited(Matches) {
-        var ID, Comments, I, N, Link, Key, Element;
-        ID = "Comments" + (SG ? "" : "_ST");
-        Comments = GM_getValue(ID);
+        var I, N, Link, Key, Element;
         for (I = 0, N = Matches.length; I < N; ++I) {
             Link = Matches[I].getAttribute("href");
             if (Link) {
                 Key = Link.match(/\/(giveaway|discussion|support\/ticket|trade)\/(.+?)\//);
-                if (Key && (((Key[1] == "giveaway") && GM_getValue("CT_G")) || (Key[1] != "giveaway")) && Comments[Key[2]]) {
+                if (Key && (((Key[1] == "giveaway") && GM_getValue("CT_G")) || (Key[1] != "giveaway")) && GM_getValue("Comments" + (SG ? "" : "_ST"))[Key[2]]) {
                     Element = Matches[I].closest("div");
                     Element.style.opacity = "0.5";
                     setHoverOpacity(Element, "1", "0.5");
@@ -3495,39 +3493,47 @@
         }
     }
 
-    function addCTButton(Context) {
-        var ID, Comments, Key;
+    function addCTPanel(Context) {
+        var CTGoToUnread;
         Context.insertAdjacentHTML(
             "afterBegin",
-            "<a class=\"page_heading_btn CTButton\" title=\"Go to the first unread comment.\">" +
-            "    <i class=\"fa fa-comments-o\"></i>" +
-            "</a>"
+            "<div class=\"page_heading_btn CTPanel\">" +
+            "    <a class=\"CTGoToUnread\" title=\"Go to the first unread comment.\">" +
+            "        <i class=\"fa fa-comments-o\"></i>" +
+            "    </a>" +
+            "    <a class=\"CTMarkRead\" title=\"Mark all comments as read.\">" +
+            "        <i class=\"fa fa-eye\"></i>" +
+            "    </a>" +
+            "</span>"
         );
-        ID = "Comments" + (SG ? "" : "_ST");
-        Comments = GM_getValue(ID);
-        Key = Path.match(/^\/(giveaway(?!.+(entries|winners))|discussion|support\/ticket|trade)\/(.+?)\//)[3];
-        if (!Comments[Key]) {
-            Comments[Key] = {};
-            GM_setValue(ID, Comments);
-        }
-        Comments = Comments[Key];
-        Context.firstElementChild.addEventListener("click", function() {
-            var Matches, I, N, CommentID;
-            Matches = document.querySelectorAll(".comment__summary, .comment_inner");
-            Comments = GM_getValue(ID)[Key];
-            for (I = 0, N = Matches.length; I < N; ++I) {
-                CommentID = SG ? Matches[I].id : Matches[I].parentElement.id;
-                if (CommentID && !Matches[I].querySelector("[data-timestamp='" + Comments[CommentID] + "']")) {
+        CTGoToUnread = Context.firstElementChild.firstElementChild;
+        CTGoToUnread.addEventListener("click", function() {
+            var Unread, ID;
+            Unread = document.getElementsByClassName("CTButton")[0];
+            if (Unread) {
+                ID = SG ? Unread.closest(".comment__summary").id : Unread.closest(".comment_inner").parentElement.id;
+                if (ID) {
                     window.location.hash = "";
-                    window.location.hash = CommentID;
-                    break;
+                    window.location.hash = ID;
+                } else {
+                    window.scrollTo(0, 0);
                 }
+            }
+        });
+        CTGoToUnread.nextElementSibling.addEventListener("click", function() {
+            var Matches, ID, Key, I, N;
+            Matches = document.getElementsByClassName("CTButton");
+            ID = "Comments" + (SG ? "" : "_ST");
+            Key = Path.match(/^\/(giveaway(?!.+(entries|winners))|discussion|support\/ticket|trade)\/(.+?)\//)[3];
+            for (I = 0, N = Matches.length; I < N; ++I) {
+                Matches[0].closest(".comment__summary, .comment_inner").style.opacity = "0.5";
+                markCTRead(Matches[0], ID, Key);
             }
         });
     }
 
     function setCTComment(Matches) {
-        var ID, Comments, Key, I, N;
+        var ID, Comments, Key, I, N, Comment, Context, CTButton;
         ID = "Comments" + (SG ? "" : "_ST");
         Comments = GM_getValue(ID);
         Key = Path.match(/^\/(giveaway(?!.+(entries|winners))|discussion|support\/ticket|trade)\/(.+?)\//)[3];
@@ -3537,46 +3543,38 @@
         }
         Comments = Comments[Key];
         for (I = 0, N = Matches.length; I < N; ++I) {
-            if (!Matches[I].closest(".comment--submit")) {
-                Matches[I].addEventListener("mouseenter", markCTRead);
-                if (Matches[I].querySelector("[data-timestamp='" + Comments[SG ? Matches[I].id : Matches[I].parentElement.id] + "']")) {
-                    Matches[I].style.opacity = "0.5";
-                    setHoverOpacity(Matches[I], "1", "0.5");
-                }
-            }
-        }
-
-        function markCTRead(Event) {
-            var Comment, Timeout;
-            Comment = Event.currentTarget;
-            Comment.removeEventListener("mouseenter", markCTRead);
-            Timeout = setTimeout(function() {
-                var Timestamp, CommentID;
-                clearTimeout(Timeout);
-                Timeout = null;
-                Timestamp = Comment.getElementsByClassName(SG ? "comment__actions" : "action_list")[0].firstElementChild.querySelectorAll("[data-timestamp]");
-                Timestamp = parseInt(Timestamp[Timestamp.length - 1].getAttribute("data-timestamp"));
-                Comments = GM_getValue(ID);
-                CommentID = SG ? Comment.id : Comment.parentElement.id;
-                if (Timestamp == Comments[Key][CommentID]) {
+            Comment = Matches[I];
+            if (!Comment.closest(".comment--submit")) {
+                if (Comment.querySelector("[data-timestamp='" + Comments[SG ? Comment.id : Comment.parentElement.id] + "']")) {
                     Comment.style.opacity = "0.5";
+                    setHoverOpacity(Comment, "1", "0.5");
                 } else {
-                    Comments[Key][CommentID] = Timestamp;
-                    GM_setValue(ID, Comments);
-                }
-                setHoverOpacity(Comment, "1", "0.5");
-            }, 1000);
-            Comment.addEventListener("mouseleave", clearCTTimeout);
-
-            function clearCTTimeout() {
-                Comment.removeEventListener("mouseleave", clearCTTimeout);
-                if (Timeout) {
-                    clearTimeout(Timeout);
-                    Timeout = null;
-                    Comment.addEventListener("mouseenter", markCTRead);
+                    Context = Matches[I].getElementsByClassName(SG ? "comment__actions" : "action_list")[0];
+                    Context.insertAdjacentHTML(
+                        "beforeEnd",
+                        "<a class=\"CTButton\" title=\"Mark comment as read.\">" +
+                        "    <i class=\"fa fa-eye\"></i>" +
+                        "</a>"
+                    );
+                    Context.lastElementChild.addEventListener("click", function(Event) {
+                        markCTRead(Event.currentTarget, ID, Key);
+                    });
                 }
             }
         }
+    }
+
+    function markCTRead(CTButton, ID, Key) {
+        var Timestamp, Comments, CommentID, Comment;
+        Timestamp = CTButton.parentElement.firstElementChild.querySelectorAll("[data-timestamp]");
+        Timestamp = parseInt(Timestamp[Timestamp.length - 1].getAttribute("data-timestamp"));
+        Comments = GM_getValue(ID);
+        Comment = CTButton.closest(".comment__summary, .comment_inner");
+        CommentID = SG ? Comment.id : Comment.parentElement.id;
+        Comments[Key][CommentID] = Timestamp;
+        GM_setValue(ID, Comments);
+        CTButton.remove();
+        setHoverOpacity(Comment, "1", "0.5");
     }
 
     // Accurate Timestamp
@@ -11319,8 +11317,8 @@
                 if (ReplyID) {
                     MR.Box.remove();
                     Reply = parseHTML(Response.responseText).getElementById(ReplyID[1]).closest(".comment");
-                    loadEndlessFeatures(Reply);
                     addRMLLink(MR.Container, [Reply]);
+                    loadEndlessFeatures(Reply);
                     MR.Children.appendChild(Reply);
                     window.location.hash = ReplyID[1];
                 } else {
@@ -11333,8 +11331,8 @@
                 if (ResponseJSON.success) {
                     MR.Box.remove();
                     Reply = parseHTML(ResponseJSON.html).getElementsByClassName("comment_outer")[0];
-                    loadEndlessFeatures(Reply);
                     addRMLLink(MR.Container, [Reply]);
+                    loadEndlessFeatures(Reply);
                     MR.Children.appendChild(Reply);
                     window.location.hash = Reply.id;
                 } else {
@@ -11775,7 +11773,7 @@
             ".rhPopupResults > * {" +
             "    margin: 0 0 15px;" +
             "}" +
-            ".rhPopupResults .popup__actions, .RMLLink {" +
+            ".rhPopupResults .popup__actions, .comment__actions .RMLLink {" +
             "    margin: 0 0 0 10px;" +
             "}" +
             ".rhPopupResults .popup__actions > * {" +
@@ -11871,7 +11869,7 @@
             "    width: 14px;" +
             "}" +
             ".ESPanel .pagination__navigation >*, .ESPanel .pagination_navigation >*, .ESRefresh, .ESPause, .UHButton, .PUNButton, .WBCButton, .NAMWCButton, .NRFButton, .UGSButton," +
-            ".CTButton, .MCBPButton, .MPPButton, .ASButton {" +
+            ".CTGoToUnread, .CTMarkRead, .MCBPButton, .MPPButton, .ASButton {" +
             "    cursor: pointer;" +
             "    display: inline-block;" +
             "}" +
@@ -11910,7 +11908,7 @@
             "    padding: 1px 2px;" +
             "    width: auto;" +
             "}" +
-            ".PUTTags >:not(:first-child), .GTTags >:not(:first-child) {" +
+            ".PUTTags >:not(:first-child), .CTPanel >:not(:first-child), .GTTags >:not(:first-child) {" +
             "    margin: 0 0 0 5px;" +
             "}" +
             ".APBox .featured__outer-wrap {" +
@@ -11937,6 +11935,13 @@
             "}" +
             ".APBox .featured__table__row {" +
             "    padding: 2px;" +
+            "}" +
+            ".comment__actions .CTButton {" +
+            "    cursor: pointer;" +
+            "    margin: 0 0 0 10px;" +
+            "}" +
+            ".comment__actions >:first-child + .CTButton {" +
+            "    margin: 0;" +
             "}" +
             ".CFHPanel {" +
             "    margin: 0 0 2px;" +
