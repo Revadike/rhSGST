@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.2.5
+// @version 4.2.6
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -865,16 +865,20 @@
         var User;
         if (!Sync.Canceled) {
             if (I < N) {
-                User = {
-                    Username: Users[I].Username,
-                    ID: Users[I].ID,
-                    SteamID64: Users[I].SteamID64,
-                    Whitelisted: false,
-                    Blacklisted: false
-                };
-                queueSave(Sync, User, function() {
-                    clearWhitelistBlacklist(Sync, ++I, N, Users, Callback);
-                });
+                if (Users[I].Whitelisted || Users[I].Blacklisted) {
+                    User = {
+                        Username: Users[I].Username,
+                        ID: Users[I].ID,
+                        SteamID64: Users[I].SteamID64,
+                        Whitelisted: false,
+                        Blacklisted: false
+                    };
+                    queueSave(Sync, User, function() {
+                        setTimeout(clearWhitelistBlacklist, 0, Sync, ++I, N, Users, Callback);
+                    });
+                } else {
+                    setTimeout(clearWhitelistBlacklist, 0, Sync, ++I, N, Users, Callback);
+                }
             } else {
                 Callback();
             }
@@ -891,7 +895,7 @@
                     var Pagination;
                     Pagination = ResponseHTML.getElementsByClassName("pagination__navigation")[0];
                     if (Pagination && !Pagination.lastElementChild.classList.contains("is-selected")) {
-                        getWhitelistBlacklist(Sync, URL, ++NextPage, Key, Callback);
+                        setTimeout(getWhitelistBlacklist, 0, Sync, URL, ++NextPage, Key, Callback);
                     } else {
                         Callback();
                     }
@@ -909,7 +913,7 @@
                 };
                 User[Key] = true;
                 queueSave(Sync, User, function() {
-                    getWhitelistBlacklistUsers(Sync, ++I, N, Matches, Key, Callback);
+                    setTimeout(getWhitelistBlacklistUsers, 0, Sync, ++I, N, Matches, Key, Callback);
                 });
             } else {
                 Callback();
@@ -2251,7 +2255,7 @@
                     Username: WBC.Users[I]
                 };
                 if (WBC.ShowResults) {
-                    setWBCResult(WBC, getUser(User), false, I, N, Callback);
+                    setTimeout(setWBCResult, 0, WBC, getUser(User), false, I, N, Callback);
                 } else {
                     queueSave(WBC, User, function() {
                         SavedUser = getUser(User);
@@ -2262,7 +2266,7 @@
                         User.Whitelisted = SavedUser.Whitelisted;
                         User.Blacklisted = SavedUser.Blacklisted;
                         checkWBCUser(WBC, User, function() {
-                            setWBCResult(WBC, User, (Result != User.WBC.Result) ? true : false, I, N, Callback);
+                            setTimeout(setWBCResult, 0, WBC, User, (Result != User.WBC.Result) ? true : false, I, N, Callback);
                         });
                     });
                 }
@@ -2281,13 +2285,13 @@
             WBC[Key + "Users"].insertAdjacentHTML("beforeEnd", "<a " + (New ? "class=\"rhBold rhItalic\" " : "") + "href=\"/user/" + User.Username + "\">" + User.Username + "</a>");
             WBC.Popup.reposition();
             if (WBC.ShowResults) {
-                checkWBCUsers(WBC, ++I, N, Callback);
+                setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
             } else if ((WBC.RW.checked && (User.WBC.Result == "Whitelisted") && !User.Whitelisted) || (WBC.B && WBC.RB.checked && (User.WBC.Result == "Blacklisted") && !User.Blacklisted)) {
                 getUserID(User, WBC, function() {
                     if (WBC.XSRFToken) {
                         returnWBCWhitelistBlacklist(WBC, User, function() {
                             queueSave(WBC, User, function() {
-                                checkWBCUsers(WBC, ++I, N, Callback);
+                                setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
                             });
                         });
                     } else {
@@ -2296,7 +2300,7 @@
                             WBC.XSRFToken = WBC.XSRFToken.value;
                             returnWBCWhitelistBlacklist(WBC, User, function() {
                                 queueSave(WBC, User, function() {
-                                    checkWBCUsers(WBC, ++I, N, Callback);
+                                    setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
                                 });
                             });
                         } else {
@@ -2305,12 +2309,12 @@
                                     WBC.XSRFToken = parseHTML(Response.responseText).querySelector("[name='xsrf_token']").value;
                                     returnWBCWhitelistBlacklist(WBC, User, function() {
                                         queueSave(WBC, User, function() {
-                                            checkWBCUsers(WBC, ++I, N, Callback);
+                                            setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
                                         });
                                     });
                                 } else {
                                     queueSave(WBC, User, function() {
-                                        checkWBCUsers(WBC, ++I, N, Callback);
+                                        setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
                                     });
                                 }
                             });
@@ -2319,7 +2323,7 @@
                 });
             } else {
                 queueSave(WBC, User, function() {
-                    checkWBCUsers(WBC, ++I, N, Callback);
+                    setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
                 });
             }
         }
@@ -2803,7 +2807,7 @@
                 if (NAMWC.ShowResults) {
                     User.NAMWC = getUser(User).NAMWC;
                     updateNAMWCResults(User, NAMWC, function() {
-                        setNAMWCResult(NAMWC, User, false, I, N, Callback);
+                        setTimeout(setNAMWCResult, 0, NAMWC, User, false, I, N, Callback);
                     });
                 } else {
                     queueSave(NAMWC, User, function() {
@@ -2823,7 +2827,7 @@
                                 } else {
                                     New = true;
                                 }
-                                setNAMWCResult(NAMWC, User, New, I, N, Callback);
+                                setTimeout(setNAMWCResult, 0, NAMWC, User, New, I, N, Callback);
                             });
                         });
                     });
@@ -2867,10 +2871,10 @@
             }
             NAMWC.Popup.reposition();
             if (NAMWC.ShowResults) {
-                checkNAMWCUsers(NAMWC, ++I, N, Callback);
+                setTimeout(checkNAMWCUsers, 0, NAMWC, ++I, N, Callback);
             } else {
                 queueSave(NAMWC, User, function() {
-                    checkNAMWCUsers(NAMWC, ++I, N, Callback);
+                    setTimeout(checkNAMWCUsers, 0, NAMWC, ++I, N, Callback);
                 });
             }
         }
@@ -3437,7 +3441,7 @@
                 UGS.Progress.innerHTML =
                     "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
                     "<span>Sending " + UGS.Giveaways[J].Name + " to " + Keys[I] + "...</span>";
-                Reroll = GM_getValue("Rerolls").indexOf(Winners[Keys[I]]) < 0;console.log(UGS.Checked);
+                Reroll = GM_getValue("Rerolls").indexOf(Winners[Keys[I]]) < 0;
                 if (Reroll && (UGS.Checked.indexOf(Keys[I] + UGS.Giveaways[J].Name) < 0)) {
                     SANM = UGS.SANM.checked;
                     SW = UGS.SW.checked;
@@ -3614,33 +3618,35 @@
             Link = Matches[I].getAttribute("href");
             if (Link) {
                 Match = Link.match(/\/(giveaway|discussion|support\/ticket|trade)\/(.+?)\//);
-                Type = Match[1];
-                Key = Match[2];
-                if (Match && (((Type == "giveaway") && GM_getValue("CT_G")) || (Type != "giveaway")) && Comments[Key] && Comments[Key].Visited) {
-                    Element = Matches[I].closest("div");
-                    Element.style.opacity = "0.5";
-                    setHoverOpacity(Element, "1", "0.5");
-                }
-                if (Type == "discussion") {
-                    CommentsCount = Matches[I].closest(".table__column--width-fill").nextElementSibling.firstElementChild;
-                    Count = parseInt(CommentsCount.textContent.replace(/,/g, ""));
-                    if (!Comments[Key]) {
-                        Comments[Key] = {};
+                if (Match) {
+                    Type = Match[1];
+                    Key = Match[2];
+                    if (Match && (((Type == "giveaway") && GM_getValue("CT_G")) || (Type != "giveaway")) && Comments[Key] && Comments[Key].Visited) {
+                        Element = Matches[I].closest("div");
+                        Element.style.opacity = "0.5";
+                        setHoverOpacity(Element, "1", "0.5");
                     }
-                    delete Comments[Key].Count;
-                    Read = Object.keys(Comments[Key]).length - 2;
-                    if (Read < 0) {
-                        Read = 0;
-                    }
-                    if (Read < Count) {
-                        CommentsCount.insertAdjacentText("beforeEnd", " (+" + (Count - Read) + ")");
-                        CommentsCount.insertAdjacentHTML(
-                            "afterEnd",
-                            "<a class=\"CTButton\" title=\"Mark all comments as read.\">" +
-                            "    <i class=\"fa fa-eye\"></i>" +
-                            "</a>"
-                        );
-                        setCTDiscussionRead(CommentsCount.nextElementSibling, CommentsCount.href, Key);
+                    if (Type == "discussion") {
+                        CommentsCount = Matches[I].closest(".table__column--width-fill").nextElementSibling.firstElementChild;
+                        Count = parseInt(CommentsCount.textContent.replace(/,/g, ""));
+                        if (!Comments[Key]) {
+                            Comments[Key] = {};
+                        }
+                        delete Comments[Key].Count;
+                        Read = Object.keys(Comments[Key]).length - 2;
+                        if (Read < 0) {
+                            Read = 0;
+                        }
+                        if (Read < Count) {
+                            CommentsCount.insertAdjacentText("beforeEnd", " (+" + (Count - Read) + ")");
+                            CommentsCount.insertAdjacentHTML(
+                                "afterEnd",
+                                "<a class=\"CTButton\" title=\"Mark all comments as read.\">" +
+                                "    <i class=\"fa fa-eye\"></i>" +
+                                "</a>"
+                            );
+                            setCTDiscussionRead(CommentsCount.nextElementSibling, CommentsCount.href, Key);
+                        }
                     }
                 }
             }
