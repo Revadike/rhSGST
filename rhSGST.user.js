@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.2.6
+// @version 4.2.7
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -376,7 +376,7 @@
         CurrentGames = {};
         for (I = 0, N = Matches.length; I < N; ++I) {
             Match = Matches[I];
-            SteamLink = Match.querySelector("a[href*='steam']");
+            SteamLink = Match.querySelector("a[href*='store.steampowered.com']");
             if (SteamLink) {
                 Game = SteamLink.getAttribute("href").match(/\d+/)[0];
                 Title = Match.firstElementChild.textContent;
@@ -3641,11 +3641,16 @@
                             CommentsCount.insertAdjacentText("beforeEnd", " (+" + (Count - Read) + ")");
                             CommentsCount.insertAdjacentHTML(
                                 "afterEnd",
-                                "<a class=\"CTButton\" title=\"Mark all comments as read.\">" +
-                                "    <i class=\"fa fa-eye\"></i>" +
-                                "</a>"
+                                " <span class=\"CTPanel\">" +
+                                "    <a class=\"CTGoToUnread\" title=\"Go to the first unread comment.\">" +
+                                "        <i class=\"fa fa-comments-o\"></i>" +
+                                "    </a>" +
+                                "    <a class=\"CTMarkRead\" title=\"Mark all comments as read.\">" +
+                                "        <i class=\"fa fa-eye\"></i>" +
+                                "    </a>" +
+                                "</span>"
                             );
-                            setCTDiscussionRead(CommentsCount.nextElementSibling, CommentsCount.href, Key);
+                            setCTPanel(CommentsCount.nextElementSibling, CommentsCount.href, Key);
                         }
                     }
                 }
@@ -3653,26 +3658,35 @@
         }
     }
 
-    function setCTDiscussionRead(CTButton, URL, Key) {
-        CTButton.addEventListener("click", function() {
-            CTButton.innerHTML = " <i class=\"fa fa-circle-o-notch fa-spin\"></i>";
+    function setCTPanel(CTPanel, URL, Key) {
+        var CTGoToUnread, CTMarkRead;
+        CTGoToUnread = CTPanel.firstElementChild;
+        CTMarkRead = CTGoToUnread.nextElementSibling;
+        CTGoToUnread.addEventListener("click", function() {
+            CTPanel.innerHTML = "<i class=\"fa fa-circle-o-notch fa-spin\"></i>";
             markCTDiscussionRead({
-                Progress: CTButton
-            }, URL + "/search?page=", 1, Key, function() {
-                CTButton.remove();
+                Progress: CTPanel
+            }, URL + "/search?page=", 1, Key, true, function(ID) {
+                window.location.href = ID ? "/go/comment/" + ID : URL;
+            });
+        });
+        CTMarkRead.addEventListener("click", function() {
+            CTPanel.innerHTML = "<i class=\"fa fa-circle-o-notch fa-spin\"></i>";
+            markCTDiscussionRead({
+                Progress: CTPanel
+            }, URL + "/search?page=", 1, Key, false, function() {
+                CTPanel.remove();
             });
         });
     }
 
-    function markCTDiscussionRead(CT, URL, NextPage, Key, Callback) {
+    function markCTDiscussionRead(CT, URL, NextPage, Key, Unread, Callback) {
         queueRequest(CT, null, URL + NextPage, function(Response) {
-            var ResponseHTML, Matches, I, N, Timestamp, Comments, Pagination;
+            var ResponseHTML, Matches, I, N, Comments, ID, Timestamp, Found, Pagination;
             ResponseHTML = parseHTML(Response.responseText);
             Matches = ResponseHTML.getElementsByClassName("comment__summary");
             for (I = 0, N = Matches.length; I < N; ++I) {
                 if (!Matches[I].closest(".comment--submit")) {
-                    Timestamp = Matches[I].getElementsByClassName("comment__actions")[0].firstElementChild.querySelectorAll("[data-timestamp]");
-                    Timestamp = parseInt(Timestamp[Timestamp.length - 1].getAttribute("data-timestamp"));
                     Comments = GM_getValue("Comments");
                     if (!Comments[Key]) {
                         Comments[Key] = {
@@ -3681,15 +3695,28 @@
                     } else if (!Comments[Key].Visited) {
                         Comments[Key].Visited = true;
                     }
-                    Comments[Key][Matches[I].id] = Timestamp;
-                    GM_setValue("Comments", Comments);
+                    ID = Matches[I].id;
+                    if (!Comments[Key][ID]) {
+                        Comments[Key][ID] = 0;
+                    }
+                    Timestamp = Matches[I].getElementsByClassName("comment__actions")[0].firstElementChild.querySelectorAll("[data-timestamp]");
+                    Timestamp = parseInt(Timestamp[Timestamp.length - 1].getAttribute("data-timestamp"));
+                    if (Comments[Key][ID] < Timestamp) {
+                        if (Unread) {
+                            Found = true;
+                            break;
+                        } else {
+                            Comments[Key][ID] = Timestamp;
+                            GM_setValue("Comments", Comments);
+                        }
+                    }
                 }
             }
             Pagination = ResponseHTML.getElementsByClassName("pagination__navigation")[0];
-            if (Matches.length && Pagination && !Pagination.lastElementChild.classList.contains("is-selected")) {
-                markCTDiscussionRead(CT, URL, ++NextPage, Key, Callback);
+            if (Matches.length && !Found && Pagination && !Pagination.lastElementChild.classList.contains("is-selected")) {
+                setTimeout(markCTDiscussionRead, 0, CT, URL, ++NextPage, Key, Unread, Callback);
             } else {
-                Callback();
+                Callback(ID);
             }
         });
     }
