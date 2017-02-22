@@ -2443,6 +2443,7 @@
                                 } else {
                                     Groups = GM_getValue("Groups");
                                     for (GroupGiveaway in User.WBC.GroupGiveaways) {
+                                        Found = false;
                                         GroupGiveaways = User.WBC.GroupGiveaways[GroupGiveaway];
                                         for (I = 0, N = GroupGiveaways.length; (I < N) && !Found; ++I) {
                                             if (Groups.indexOf(GroupGiveaways[I]) >= 0) {
@@ -2774,10 +2775,12 @@
             checkNAMWCUsers(NAMWC, 0, 1, Callback);
         } else {
             for (Username in Users) {
-                if (NAMWC.Users.length < 26) {
-                    NAMWC.Users.push(Username);
-                } else {
-                    break;
+                if (Username != GM_getValue("Username")) {
+                    if (NAMWC.Users.length < 26) {
+                        NAMWC.Users.push(Username);
+                    } else {
+                        break;
+                    }
                 }
             }
             NAMWC.Users = sortArray(NAMWC.Users);
@@ -3722,7 +3725,7 @@
     }
 
     function setCTComment(Matches) {
-        var ID, Comments, Key, I, N, Comment, Context, CTButton;
+        var ID, Comments, Key, I, N, Comment, CommentID, Timestamp, Context;
         ID = "Comments" + (SG ? "" : "_ST");
         Comments = GM_getValue(ID);
         Key = Path.match(/^\/(giveaway(?!.+(entries|winners))|discussion|support\/ticket|trade)\/(.+?)\//)[3];
@@ -3735,14 +3738,17 @@
             Comments[Key].Visited = true;
             GM_setValue(ID, Comments);
         }
-        Comments = Comments[Key];
         for (I = 0, N = Matches.length; I < N; ++I) {
             Comment = Matches[I];
             if (!Comment.closest(".comment--submit")) {
-                if (Comment.querySelector("[data-timestamp='" + Comments[SG ? Comment.id : Comment.parentElement.id] + "']")) {
+                CommentID = SG ? Comment.id : Comment.parentElement.id;
+                Timestamp = Comment.querySelectorAll("[data-timestamp]");
+                Timestamp = parseInt(Timestamp[Timestamp.length - 1].getAttribute("data-timestamp"));
+                if (Timestamp == Comments[Key][CommentID]) {
                     Comment.style.opacity = "0.5";
                     setHoverOpacity(Comment, "1", "0.5");
                 } else {
+                    delete Comments[Key][CommentID];
                     Context = Matches[I].getElementsByClassName(SG ? "comment__actions" : "action_list")[0];
                     Context.insertAdjacentHTML(
                         "beforeEnd",
@@ -3756,6 +3762,7 @@
                 }
             }
         }
+        GM_setValue("Comments", Comments);
     }
 
     function markCTRead(CTButton, ID, Key) {
