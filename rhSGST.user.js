@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.3.1
+// @version 4.3.2
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -117,7 +117,10 @@
             Name: "Advanced Giveaway Search"
         },
         EGB: {
-            Name: "Enter Giveaway Button"
+            Name: "Enter Giveaway Button",
+            EGB_D: {
+                Name: "Display the giveaway description upon entering, if any."
+            }
         },
         CT: {
             Name: "Comment Tracker",
@@ -3635,43 +3638,33 @@
         Code = URL.match(/\/giveaway\/(.+?)\//)[1];
         Entries = Context.getElementsByClassName("giveaway__links")[0].firstElementChild.lastElementChild;
         Points = document.getElementsByClassName("nav__points")[0];
-        if (Context.classList.contains("is-faded")) {
-            setEGBButton(EGBButton, "fa-minus-circle", "Leave", "Leaving...", XSRFToken, "entry_delete", Code, Context, Entries, Points);
-        } else {
-            setEGBButton(EGBButton, "fa-plus-circle", "Enter", "Entering...", XSRFToken, "entry_insert", Code, Context, Entries, Points);
-        }
         EGBDescription = EGBButton.nextElementSibling;
         EGBDescription.addEventListener("click", function() {
-            EGBDescription.innerHTML = "<i class=\"fa fa-circle-o-notch fa-spin\"></i>";
-            makeRequest(null, URL, null, function(Response) {
-                var Popup, Description;
-                EGBDescription.innerHTML = "<i class=\"fa fa-file-text\"></i>";
-                Description = parseHTML(Response.responseText).getElementsByClassName("page__description")[0];
-                if (Description) {
-                    Popup = createPopup(true);
-                    Popup.Popup.classList.add("EGBDescriptionPopup");
-                    Popup.Icon.classList.add("fa-file-text");
-                    Popup.Title.innerHTML = "<span>" + Title + "</span> Description";
-                    Popup.Description.appendChild(Description);
-                    Popup.popUp();
-                }
-            });
+            displayEGBDescription(EGBDescription, URL, Title);
         });
+        if (Context.classList.contains("is-faded")) {
+            setEGBButton(EGBButton, "fa-minus-circle", "Leave", "Leaving...", XSRFToken, "entry_delete", Code, Context, Entries, Points, EGBDescription, URL, Title);
+        } else {
+            setEGBButton(EGBButton, "fa-plus-circle", "Enter", "Entering...", XSRFToken, "entry_insert", Code, Context, Entries, Points, EGBDescription, URL, Title);
+        }
     }
 
-    function setEGBButton(EGBButton, DefaultIcon, DefaultName, Message, XSRFToken, Type, Code, Context, Entries, Points) {
+    function setEGBButton(EGBButton, DefaultIcon, DefaultName, Message, XSRFToken, Type, Code, Context, Entries, Points, EGBDescription, URL, Title) {
         createButton(EGBButton, DefaultIcon, DefaultName, "fa-circle-o-notch fa-spin", Message, function(Callback) {
             makeRequest("xsrf_token=" + XSRFToken + "&do=" + Type + "&code=" + Code, "/ajax.php", null, function(Response) {
                 var ResponseJSON;
-                ResponseJSON = parseJSON(Response.responseText);console.log(Type, Code, ResponseJSON);
+                ResponseJSON = parseJSON(Response.responseText);
                 if (ResponseJSON.type == "success") {
                     Context.classList.toggle("is-faded");
                     Entries.textContent = ResponseJSON.entry_count + " entries";
                     Points.textContent = ResponseJSON.points;
                     if (Context.classList.contains("is-faded")) {
-                        setEGBButton(EGBButton, "fa-minus-circle", "Leave", "Leaving...", XSRFToken, "entry_delete", Code, Context, Entries, Points);
+                        if (GM_getValue("EGB_D")) {
+                            displayEGBDescription(EGBDescription, URL, Title);
+                        }
+                        setEGBButton(EGBButton, "fa-minus-circle", "Leave", "Leaving...", XSRFToken, "entry_delete", Code, Context, Entries, Points, EGBDescription, URL, Title);
                     } else {
-                        setEGBButton(EGBButton, "fa-plus-circle", "Enter", "Entering...", XSRFToken, "entry_insert", Code, Context, Entries, Points);
+                        setEGBButton(EGBButton, "fa-plus-circle", "Enter", "Entering...", XSRFToken, "entry_insert", Code, Context, Entries, Points, EGBDescription, URL, Title);
                     }
                 } else {
                     Points.textContent = ResponseJSON.points;
@@ -3684,6 +3677,23 @@
                 }
             });
         }, null, false, Context.classList.contains("is-faded") ? true : false);
+    }
+
+    function displayEGBDescription(EGBDescription, URL, Title) {
+        EGBDescription.innerHTML = "<i class=\"fa fa-circle-o-notch fa-spin\"></i>";
+        makeRequest(null, URL, null, function(Response) {
+            var Popup, Description;
+            EGBDescription.innerHTML = "<i class=\"fa fa-file-text\"></i>";
+            Description = parseHTML(Response.responseText).getElementsByClassName("page__description")[0];
+            if (Description) {
+                Popup = createPopup(true);
+                Popup.Popup.classList.add("EGBDescriptionPopup");
+                Popup.Icon.classList.add("fa-file-text");
+                Popup.Title.innerHTML = "<span>" + Title + "</span> Description";
+                Popup.Description.appendChild(Description);
+                Popup.popUp();
+            }
+        });
     }
 
     // Comment Tracker
