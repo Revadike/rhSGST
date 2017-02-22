@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.2.3
+// @version 4.2.4
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -11917,6 +11917,9 @@
 
     function addStyles() {
         GM_addStyle(
+            ".comment {" +
+            "    word-break: break-word;" +
+            "}" +
             ".rhHidden {" +
             "    display: none !important;" +
             "}" +
