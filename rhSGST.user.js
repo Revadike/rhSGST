@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.3
+// @version 4.3.1
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -3652,7 +3652,7 @@
                     Popup.Popup.classList.add("EGBDescriptionPopup");
                     Popup.Icon.classList.add("fa-file-text");
                     Popup.Title.innerHTML = "<span>" + Title + "</span> Description";
-                    Popup.Description.appendChild();
+                    Popup.Description.appendChild(Description);
                     Popup.popUp();
                 }
             });
