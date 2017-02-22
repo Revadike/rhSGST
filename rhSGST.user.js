@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.2
+// @version 4.2.1
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -261,7 +261,8 @@
             SyncFrequency: 7,
             Comments: {},
             Comments_ST: {},
-            Emojis: ""
+            Emojis: "",
+            Rerolls: []
         };
         rhSGST = GM_getValue("rhSGST");
         for (Key in DefaultValues) {
@@ -302,6 +303,8 @@
             addSMButton();
         } else if (Path.match(/^\/user\//)) {
             loadProfileFeatures(document);
+        } else if (Path.match(/^\/support\/tickets\/new/)) {
+            setUGSObserver();
         } else if (GM_getValue("DED") && Path.match(/^\/discussion\//)) {
             CommentBox = document.getElementsByClassName(SG ? "comment--submit" : "reply_form")[0];
             if (CommentBox) {
@@ -3243,6 +3246,20 @@
 
     // Unsent Gifts Sender
 
+    function setUGSObserver() {
+        document.getElementsByClassName("form__submit-button")[0].addEventListener("click", function() {
+            var Winner, Rerolls;
+            if (document.querySelector("[name='category_id']").value == 1) {
+                Winner = document.querySelector("[name='reroll_winner_id']").value;
+                Rerolls = GM_getValue("Rerolls");
+                if (Rerolls.indexOf(Winner) < 0) {
+                    Rerolls.push(Winner);
+                    GM_setValue("Rerolls", Rerolls);
+                }
+            }
+        });
+    }
+
     function addUGSButton(Context) {
         var Popup, UGS, UGSButton;
         Popup = createPopup();
@@ -3286,13 +3303,14 @@
             UGS.SentCount.textContent = UGS.UnsentCount.textContent = "0";
             UGS.SentUsers.innerHTML = UGS.UnsentUsers.innerHTML = "";
             UGS.Canceled = false;
-            UGS.Giveaways = {};
+            UGS.Giveaways = [];
+            UGS.Checked = [];
             Match = Location.match(/page=(\d+)/);
             getUGSGiveaways(UGS, 1, Match ? parseInt(Match[1]) : 1, function() {
-                var Keys;
-                Keys = Object.keys(UGS.Giveaways);
-                if (Keys.length) {
-                    getUGSWinners(UGS, 0, Keys.length, Keys, function() {
+                var N;
+                N = UGS.Giveaways.length;
+                if (N > 0) {
+                    getUGSWinners(UGS, 0, N, function() {
                         UGSButton.classList.remove("rhBusy");
                         UGS.Progress.innerHTML = UGS.OverallProgress.innerHTML = "";
                         Callback();
@@ -3338,8 +3356,10 @@
             N = Matches.length;
             if (N > 0) {
                 for (I = 0; I < N; ++I) {
-                    UGS.Giveaways[Matches[I].closest(".table__row-inner-wrap").getElementsByClassName("table__column__heading")[0].textContent] =
-                        Matches[I].nextElementSibling.getAttribute("href");
+                    UGS.Giveaways.push({
+                        Name: Matches[I].closest(".table__row-inner-wrap").getElementsByClassName("table__column__heading")[0].textContent.match(/(.+?)( \(.+ Copies\))?$/)[1],
+                        URL: Matches[I].nextElementSibling.getAttribute("href")
+                    });
                 }
                 Pagination = Context.getElementsByClassName("pagination__navigation")[0];
                 if (Pagination && !Pagination.lastElementChild.classList.contains("is-selected")) {
@@ -3364,14 +3384,14 @@
         }
     }
 
-    function getUGSWinners(UGS, I, N, Keys, Callback) {
+    function getUGSWinners(UGS, I, N, Callback) {
         if (!UGS.Canceled) {
             UGS.OverallProgress.textContent = I + " of " + N + " giveaways retrieved...";
             if (I < N) {
                 UGS.Progress.innerHTML =
                     "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
                     "<span>Retrieving winners...</span>";
-                queueRequest(UGS, null, UGS.Giveaways[Keys[I]], function(Response) {
+                queueRequest(UGS, null, UGS.Giveaways[I].URL, function(Response) {
                     var ResponseHTML, Matches, Winners, J, NumMatches, WinnersKeys;
                     ResponseHTML = parseHTML(Response.responseText);
                     if (!UGS.XSRFToken) {
@@ -3384,18 +3404,18 @@
                     }
                     if (NumMatches < 25) {
                         WinnersKeys = sortArray(Object.keys(Winners));
-                        sendUGSGifts(UGS, 0, WinnersKeys.length, Keys[I], WinnersKeys, Winners, function() {
-                            getUGSWinners(UGS, ++I, N, Keys, Callback);
+                        sendUGSGifts(UGS, 0, WinnersKeys.length, I, WinnersKeys, Winners, function() {
+                            getUGSWinners(UGS, ++I, N, Callback);
                         });
                     } else {
-                        queueRequest(UGS, null, UGS.Giveaways[Keys[I]] + "/search?page=2", function(Response) {
+                        queueRequest(UGS, null, UGS.Giveaways[I].URL + "/search?page=2", function(Response) {
                             Matches = parseHTML(Response.responseText).getElementsByClassName("table__row-inner-wrap");
                             for (J = 0, NumMatches = Matches.length; J < NumMatches; ++J) {
                                 Winners[Matches[J].getElementsByClassName("table__column__heading")[0].textContent] = Matches[J].querySelector("[name='winner_id']").value;
                             }
                             WinnersKeys = sortArray(Object.keys(Winners));
-                            sendUGSGifts(UGS, 0, WinnersKeys.length, Keys[I], WinnersKeys, Winners, function() {
-                                getUGSWinners(UGS, ++I, N, Keys, Callback);
+                            sendUGSGifts(UGS, 0, WinnersKeys.length, I, WinnersKeys, Winners, function() {
+                                getUGSWinners(UGS, ++I, N, Callback);
                             });
                         });
                     }
@@ -3406,67 +3426,84 @@
         }
     }
 
-    function sendUGSGifts(UGS, I, N, Key, Keys, Winners, Callback) {
-        var SANM, SW, User;
+    function sendUGSGifts(UGS, I, N, J, Keys, Winners, Callback) {
+        var Reroll, SANM, SW, User;
         if (!UGS.Canceled) {
             UGS.OverallProgress.innerHTML = I + " of " + N + " winners checked...";
             if (I < N) {
                 UGS.Progress.innerHTML =
                     "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
-                    "<span>Sending " + Key + " to " + Keys[I] + "...</span>";
-                SANM = UGS.SANM.checked;
-                SW = UGS.SW.checked;
-                if (SANM || SW) {
-                    User = {
-                        Username: Keys[I]
-                    };
-                    queueSave(UGS, User, function() {
-                        var SavedUser;
-                        SavedUser = getUser(User);
-                        if (SANM) {
-                            if (SW && SavedUser.Whitelisted) {
-                                sendUGSGift(UGS, Winners, Keys, I, Key, N, Callback);
-                            } else {
-                                User.NAMWC = SavedUser.NAMWC;
-                                updateNAMWCResults(User, UGS, function() {
-                                    if (!User.NAMWC) {
-                                        User.NAMWC = {
-                                            Results: {}
-                                        };
-                                    }
-                                    checkNAMWCNotActivated(UGS, User, function() {
-                                        checkNAMWCMultiple(UGS, User, function() {
-                                            queueSave(UGS, User, function() {
-                                                if (User.NAMWC.Results.Activated && User.NAMWC.Results.NotMultiple) {
-                                                    sendUGSGift(UGS, Winners, Keys, I, Key, N, Callback);
-                                                } else {
-                                                    UGS.Unsent.classList.remove("rhHidden");
-                                                    UGS.UnsentCount.textContent = parseInt(UGS.UnsentCount.textContent) + 1;
-                                                    UGS.UnsentUsers.insertAdjacentHTML(
-                                                        "beforeEnd",
-                                                        "<span><a href=\"/user/" + Keys[I] + "\">" + Keys[I] + "</a> (<a href=\"" + UGS.Giveaways[Key] + "\">" + Key + "</a>)</span>"
-                                                    );
-                                                    sendUGSGifts(UGS, ++I, N, Key, Keys, Winners, Callback);
-                                                }
+                    "<span>Sending " + UGS.Giveaways[J].Name + " to " + Keys[I] + "...</span>";
+                Reroll = GM_getValue("Rerolls").indexOf(Winners[Keys[I]]) < 0;console.log(UGS.Checked);
+                if (Reroll && (UGS.Checked.indexOf(Keys[I] + UGS.Giveaways[J].Name) < 0)) {
+                    SANM = UGS.SANM.checked;
+                    SW = UGS.SW.checked;
+                    if (SANM || SW) {
+                        User = {
+                            Username: Keys[I]
+                        };
+                        queueSave(UGS, User, function() {
+                            var SavedUser;
+                            SavedUser = getUser(User);
+                            if (SANM) {
+                                if (SW && SavedUser.Whitelisted) {
+                                    sendUGSGift(UGS, Winners, Keys, I, J, N, Callback);
+                                } else {
+                                    User.NAMWC = SavedUser.NAMWC;
+                                    updateNAMWCResults(User, UGS, function() {
+                                        if (!User.NAMWC) {
+                                            User.NAMWC = {
+                                                Results: {}
+                                            };
+                                        }
+                                        checkNAMWCNotActivated(UGS, User, function() {
+                                            checkNAMWCMultiple(UGS, User, function() {
+                                                queueSave(UGS, User, function() {
+                                                    if (User.NAMWC.Results.Activated && User.NAMWC.Results.NotMultiple) {
+                                                        sendUGSGift(UGS, Winners, Keys, I, J, N, Callback);
+                                                    } else {
+                                                        UGS.Checked.push(Keys[I] + UGS.Giveaways[J].Name);
+                                                        UGS.Unsent.classList.remove("rhHidden");
+                                                        UGS.UnsentCount.textContent = parseInt(UGS.UnsentCount.textContent) + 1;
+                                                        UGS.UnsentUsers.insertAdjacentHTML(
+                                                            "beforeEnd",
+                                                            "<span><a href=\"/user/" + Keys[I] + "\">" + Keys[I] + "</a> (<a href=\"" + UGS.Giveaways[J].URL + "\">" + UGS.Giveaways[J].Name +
+                                                            "</a>)</span>"
+                                                        );
+                                                        sendUGSGifts(UGS, ++I, N, J, Keys, Winners, Callback);
+                                                    }
+                                                });
                                             });
                                         });
                                     });
-                                });
+                                }
+                            } else if (SavedUser.Whitelisted) {
+                                sendUGSGift(UGS, Winners, Keys, I, J, N, Callback);
+                            } else {
+                                UGS.Checked.push(Keys[I] + UGS.Giveaways[J].Name);
+                                UGS.Unsent.classList.remove("rhHidden");
+                                UGS.UnsentCount.textContent = parseInt(UGS.UnsentCount.textContent) + 1;
+                                UGS.UnsentUsers.insertAdjacentHTML(
+                                    "beforeEnd",
+                                    "<span><a href=\"/user/" + Keys[I] + "\">" + Keys[I] + "</a> (<a href=\"" + UGS.Giveaways[J].URL + "\">" + UGS.Giveaways[J].Name + "</a>)</span>"
+                                );
+                                sendUGSGifts(UGS, ++I, N, J, Keys, Winners, Callback);
                             }
-                        } else if (SavedUser.Whitelisted) {
-                            sendUGSGift(UGS, Winners, Keys, I, Key, N, Callback);
-                        } else {
-                            UGS.Unsent.classList.remove("rhHidden");
-                            UGS.UnsentCount.textContent = parseInt(UGS.UnsentCount.textContent) + 1;
-                            UGS.UnsentUsers.insertAdjacentHTML(
-                                "beforeEnd",
-                                "<span><a href=\"/user/" + Keys[I] + "\">" + Keys[I] + "</a> (<a href=\"" + UGS.Giveaways[Key] + "\">" + Key + "</a>)</span>"
-                            );
-                            sendUGSGifts(UGS, ++I, N, Key, Keys, Winners, Callback);
-                        }
-                    });
+                        });
+                    } else {
+                        sendUGSGift(UGS, Winners, Keys, I, J, N, Callback);
+                    }
                 } else {
-                    sendUGSGift(UGS, Winners, Keys, I, Key, N, Callback);
+                    UGS.Checked.push(Keys[I] + UGS.Giveaways[J].Name);
+                    UGS.Unsent.classList.remove("rhHidden");
+                    UGS.UnsentCount.textContent = parseInt(UGS.UnsentCount.textContent) + 1;
+                    UGS.UnsentUsers.insertAdjacentHTML(
+                        "beforeEnd",
+                        "<span><a href=\"/user/" + Keys[I] + "\">" + Keys[I] + "</a> (" + (!Reroll ? ("Being rerolled for <a href=\"" + UGS.Giveaways[J].URL + "\">" + UGS.Giveaways[J].Name +
+                                                                                                     "</a>.)") : ("Already won <a href=\"" + UGS.Giveaways[J].URL + "\">" +
+                                                                                                                  UGS.Giveaways[J].Name + "</a> from you.)")) + "</span>"
+                    );
+                    sendUGSGifts(UGS, ++I, N, J, Keys, Winners, Callback);
                 }
             } else {
                 Callback();
@@ -3474,16 +3511,17 @@
         }
     }
 
-    function sendUGSGift(UGS, Winners, Keys, I, Key, N, Callback) {
+    function sendUGSGift(UGS, Winners, Keys, I, J, N, Callback) {
         if (!UGS.Canceled) {
             queueRequest(UGS, "xsrf_token=" + UGS.XSRFToken + "&do=sent_feedback&action=1&winner_id=" + Winners[Keys[I]], "/ajax.php", function(Response) {
+                UGS.Checked.push(Keys[I] + UGS.Giveaways[J].Name);
                 UGS.Sent.classList.remove("rhHidden");
                 UGS.SentCount.textContent = parseInt(UGS.SentCount.textContent) + 1;
                 UGS.SentUsers.insertAdjacentHTML(
                     "beforeEnd",
-                    "<span><a href=\"/user/" + Keys[I] + "\">" + Keys[I] + "</a> (<a href=\"" + UGS.Giveaways[Key] + "\">" + Key + "</a>)</span>"
+                    "<span><a href=\"/user/" + Keys[I] + "\">" + Keys[I] + "</a> (<a href=\"" + UGS.Giveaways[J].URL + "\">" + UGS.Giveaways[J].Name + "</a>)</span>"
                 );
-                sendUGSGifts(UGS, ++I, N, Key, Keys, Winners, Callback);
+                sendUGSGifts(UGS, ++I, N, J, Keys, Winners, Callback);
             });
         }
     }
@@ -3627,7 +3665,11 @@
                     Timestamp = Matches[I].getElementsByClassName("comment__actions")[0].firstElementChild.querySelectorAll("[data-timestamp]");
                     Timestamp = parseInt(Timestamp[Timestamp.length - 1].getAttribute("data-timestamp"));
                     Comments = GM_getValue("Comments");
-                    if (!Comments[Key].Visited) {
+                    if (!Comments[Key]) {
+                        Comments[Key] = {
+                            Visited: true
+                        };
+                    } else if (!Comments[Key].Visited) {
                         Comments[Key].Visited = true;
                     }
                     Comments[Key][Matches[I].id] = Timestamp;
@@ -3692,8 +3734,7 @@
                 Visited: true
             };
             GM_setValue(ID, Comments);
-        }
-        if (!Comments[Key].Visited) {
+        } else if (!Comments[Key].Visited) {
             Comments[Key].Visited = true;
             GM_setValue(ID, Comments);
         }
@@ -11881,7 +11922,7 @@
             ".rhItalic {" +
             "    font-style: italic;" +
             "}" +
-            ".rhBusy > *, .CFHALIPF {" +
+            ".rhBusy >*, .CFHALIPF {" +
             "    opacity: 0.2;" +
             "}" +
             ".rhPopup {" +
@@ -11915,7 +11956,7 @@
             "    min-width: 200px;" +
             "    padding: 7px 15px;" +
             "}" +
-            ".rhPopupButton div > * {" +
+            ".rhPopupButton div >* {" +
             "    flex: 0;" +
             "}" +
             ".rhPopupStatus {" +
@@ -11926,14 +11967,19 @@
             "    max-height: 200px;" +
             "    overflow: auto;" +
             "}" +
-            ".rhPopupResults > * {" +
+            ".rhPopupResults >* {" +
             "    margin: 0 0 15px;" +
             "}" +
             ".rhPopupResults .popup__actions, .comment__actions .RMLLink {" +
             "    margin: 0 0 0 10px;" +
             "}" +
-            ".rhPopupResults .popup__actions > * {" +
+            ".rhPopupResults .popup__actions >* {" +
+            "    border: 0;" +
+            "    cursor: initial;" +
             "    display: inline-block;" +
+            "}" +
+            ".rhPopupResults .popup__actions a {" +
+            "    border-bottom: 1px dotted;" +
             "}" +
             ".rhPopupResults .table__row-outer-wrap {" +
             "    margin: 0;" +
@@ -11948,7 +11994,7 @@
             "    width: 375px;" +
             "    z-index: 997;" +
             "}" +
-            ".rhCheckbox, .APAvatar, .APLink, .APLink > * {" +
+            ".rhCheckbox, .APAvatar, .APLink, .APLink >* {" +
             "    cursor: pointer;" +
             "}" +
             ".rhWBIcon {" +
@@ -12013,7 +12059,7 @@
             "    margin: 5px 0 15px;" +
             "    padding: 0;" +
             "}" +
-            ".ESPanel > *:not(:last-child), .APBox .featured__table__row__left, .MRReply, .MREdit {" +
+            ".ESPanel >*:not(:last-child), .APBox .featured__table__row__left, .MRReply, .MREdit {" +
             "    margin: 0 10px 0 0;" +
             "}" +
             ".ESStatus {" +
