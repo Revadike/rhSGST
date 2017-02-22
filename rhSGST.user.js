@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.2.7
+// @version 4.3
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -115,6 +115,9 @@
         },
         AGS: {
             Name: "Advanced Giveaway Search"
+        },
+        EGB: {
+            Name: "Enter Giveaway Button"
         },
         CT: {
             Name: "Comment Tracker",
@@ -468,6 +471,10 @@
             Check: GM_getValue("AP"),
             Query: ".global__image-outer-wrap--avatar-small",
             Callback: addAPBox
+        }, {
+            Check: GM_getValue("EGB") && Path.match(/^\/($|giveaways)/),
+            Query: ".giveaway__row-inner-wrap",
+            Callback: addEGBPanel
         }, {
             Check: GM_getValue("CT"),
             Query: ".table__column__heading, .giveaway__heading__name, .column_flex h3 a",
@@ -1054,10 +1061,10 @@
         }
     }
 
-    function createButton(Context, DefaultIcon, DefaultName, OnClickIcon, OnClickName, DefaultCallback, OnClickCallback, White) {
+    function createButton(Context, DefaultIcon, DefaultName, OnClickIcon, OnClickName, DefaultCallback, OnClickCallback, White, Yellow) {
         var DefaultButton, OnClickButton;
         Context.innerHTML =
-            "<div class=\"" + (White ? "form__saving-button white" : "form__submit-button green") + " btn_action rhDefaultButton\">" +
+            "<div class=\"" + (White ? "form__saving-button white" : (Yellow ? "sidebar__entry-delete" : "form__submit-button green")) + " btn_action rhDefaultButton\">" +
             "    <i class=\"fa " + DefaultIcon + "\"></i>" +
             "    <span>" + DefaultName + "</span>" +
             "</div>" +
@@ -3606,6 +3613,77 @@
             AGS[Filters[I].Key + "_min"] = AGSFilter.firstElementChild.firstElementChild;
             AGS[Filters[I].Key + "_max"] = AGSFilter.lastElementChild.firstElementChild;
         }
+    }
+
+    // Enter Giveaway Button
+
+    function addEGBPanel(Context) {
+        var EGBPanel, EGBButton, Columns, XSRFToken, Title, URL, Code, Entries, Points, EGBDescription;
+        Columns = Context.getElementsByClassName("giveaway__columns")[0];
+        Columns.insertAdjacentHTML(
+            "afterBegin",
+            "<div class=\"EGBButton\"></div>" +
+            "<a class=\"EGBDescription\" title=\"Read giveaway description.\">" +
+            "    <i class=\"fa fa-file-text\"></i>" +
+            "</a>"
+        );
+        EGBButton = Columns.firstElementChild;
+        XSRFToken = document.querySelector("[name='xsrf_token']").value;
+        Title = Context.getElementsByClassName("giveaway__heading__name")[0];
+        URL = Title.getAttribute("href");
+        Title = Title.textContent;
+        Code = URL.match(/\/giveaway\/(.+?)\//)[1];
+        Entries = Context.getElementsByClassName("giveaway__links")[0].firstElementChild.lastElementChild;
+        Points = document.getElementsByClassName("nav__points")[0];
+        if (Context.classList.contains("is-faded")) {
+            setEGBButton(EGBButton, "fa-minus-circle", "Leave", "Leaving...", XSRFToken, "entry_delete", Code, Context, Entries, Points);
+        } else {
+            setEGBButton(EGBButton, "fa-plus-circle", "Enter", "Entering...", XSRFToken, "entry_insert", Code, Context, Entries, Points);
+        }
+        EGBDescription = EGBButton.nextElementSibling;
+        EGBDescription.addEventListener("click", function() {
+            EGBDescription.innerHTML = "<i class=\"fa fa-circle-o-notch fa-spin\"></i>";
+            makeRequest(null, URL, null, function(Response) {
+                var Popup, Description;
+                EGBDescription.innerHTML = "<i class=\"fa fa-file-text\"></i>";
+                Description = parseHTML(Response.responseText).getElementsByClassName("page__description")[0];
+                if (Description) {
+                    Popup = createPopup(true);
+                    Popup.Popup.classList.add("EGBDescriptionPopup");
+                    Popup.Icon.classList.add("fa-file-text");
+                    Popup.Title.innerHTML = "<span>" + Title + "</span> Description";
+                    Popup.Description.appendChild();
+                    Popup.popUp();
+                }
+            });
+        });
+    }
+
+    function setEGBButton(EGBButton, DefaultIcon, DefaultName, Message, XSRFToken, Type, Code, Context, Entries, Points) {
+        createButton(EGBButton, DefaultIcon, DefaultName, "fa-circle-o-notch fa-spin", Message, function(Callback) {
+            makeRequest("xsrf_token=" + XSRFToken + "&do=" + Type + "&code=" + Code, "/ajax.php", null, function(Response) {
+                var ResponseJSON;
+                ResponseJSON = parseJSON(Response.responseText);console.log(Type, Code, ResponseJSON);
+                if (ResponseJSON.type == "success") {
+                    Context.classList.toggle("is-faded");
+                    Entries.textContent = ResponseJSON.entry_count + " entries";
+                    Points.textContent = ResponseJSON.points;
+                    if (Context.classList.contains("is-faded")) {
+                        setEGBButton(EGBButton, "fa-minus-circle", "Leave", "Leaving...", XSRFToken, "entry_delete", Code, Context, Entries, Points);
+                    } else {
+                        setEGBButton(EGBButton, "fa-plus-circle", "Enter", "Entering...", XSRFToken, "entry_insert", Code, Context, Entries, Points);
+                    }
+                } else {
+                    Points.textContent = ResponseJSON.points;
+                    EGBButton.innerHTML =
+                        "<div class=\"sidebar__error is-disabled\">" +
+                        "    <i class=\"fa fa-exclamation-circle\"></i> " +
+                        "    <span>" + ResponseJSON.msg + "</span>" +
+                        "</div>";
+                    Callback();
+                }
+            });
+        }, null, false, Context.classList.contains("is-faded") ? true : false);
     }
 
     // Comment Tracker
@@ -12114,7 +12192,7 @@
             "    width: 14px;" +
             "}" +
             ".ESPanel .pagination__navigation >*, .ESPanel .pagination_navigation >*, .ESRefresh, .ESPause, .UHButton, .PUNButton, .WBCButton, .NAMWCButton, .NRFButton, .UGSButton," +
-            ".CTGoToUnread, .CTMarkRead, .MCBPButton, .MPPButton, .ASButton {" +
+            ".EGBDescription, .CTGoToUnread, .CTMarkRead, .MCBPButton, .MPPButton, .ASButton {" +
             "    cursor: pointer;" +
             "    display: inline-block;" +
             "}" +
@@ -12196,6 +12274,21 @@
             ".AGSPanel input, .AGSPanel select {" +
             "    padding: 0 5px;" +
             "    width: 50px;" +
+            "}" +
+            ".EGBButton {" +
+            "    background: none;" +
+            "    border: 0;" +
+            "    box-shadow: none;" +
+            "    padding: 0;" +
+            "}" +
+            ".EGBButton >* {" +
+            "    line-height: inherit;" +
+            "    margin: 0;" +
+            "}" +
+            ".EGBDescriptionPopup {" +
+            "    height: 75%;" +
+            "    overflow: auto;" +
+            "    width: 75%;" +
             "}" +
             ".CTButton {" +
             "    cursor: pointer;" +
