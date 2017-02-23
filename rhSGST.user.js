@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.3.2
+// @version 4.4
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -63,6 +63,9 @@
             },
             ES_RD: {
                 Name: "Show recent discussions at the top."
+            },
+            ES_RS: {
+                Name: "Reverse Scrolling"
             }
         },
         SGPB: {
@@ -116,11 +119,23 @@
         AGS: {
             Name: "Advanced Giveaway Search"
         },
+        EGH: {
+            Name: "Entered Games Highlighter"
+        },
+        EGF: {
+            Name: "Entered Giveaways Filter"
+        },
         EGB: {
             Name: "Enter Giveaway Button",
             EGB_D: {
                 Name: "Display the giveaway description upon entering, if any."
+            },
+            EGB_C: {
+                Name: "Pop up the box to add a comment to the giveaway even if it doesn't have any description."
             }
+        },
+        DH: {
+            Name: "Discussions Highlighter"
         },
         CT: {
             Name: "Comment Tracker",
@@ -235,7 +250,6 @@
     }
     setDefaultValues();
     addStyles();
-    setNAMWCColors();
     loadFeatures();
     if (SG) {
         checkSync();
@@ -318,6 +332,8 @@
             }
         } else if (GM_getValue("AGS") && Path.match(/^\/($|giveaways(?!\/(wishlist|created|entered|won)))/)) {
             addAGSPanel();
+        } else if (GM_getValue("EGH") && Path.match(/^\/giveaway\//)) {
+            setEGHHighlighter();
         }
         Users = {};
         Games = {};
@@ -429,11 +445,14 @@
                 }
             }
         }
-        if (GM_getValue("GT")) {
-            SavedGames = GM_getValue("Games");
-            for (Game in SavedGames) {
-                if (CurrentGames[Game]) {
+        SavedGames = GM_getValue("Games");
+        for (Game in SavedGames) {
+            if (CurrentGames[Game]) {
+                if (GM_getValue("GT")) {
                     addGTTags(Game, SavedGames[Game].Tags);
+                }
+                if (GM_getValue("EGH") && SavedGames[Game].Entered) {
+                    highlightEGHGame(Game, CurrentGames[Game]);
                 }
             }
         }
@@ -475,9 +494,17 @@
             Query: ".global__image-outer-wrap--avatar-small",
             Callback: addAPBox
         }, {
+            Check: GM_getValue("EGF"),
+            Query: ".giveaway__row-inner-wrap.is-faded",
+            Callback: hideEGFGiveaway
+        }, {
             Check: GM_getValue("EGB") && Path.match(/^\/($|giveaways)/),
             Query: ".giveaway__row-inner-wrap",
             Callback: addEGBPanel
+        }, {
+            Check: GM_getValue("DH") && Path.match(/^\/discussions/),
+            Query: ".table__row-outer-wrap",
+            Callback: highlightDHDiscussion
         }, {
             Check: GM_getValue("CT"),
             Query: ".table__column__heading, .giveaway__heading__name, .column_flex h3 a",
@@ -1553,14 +1580,22 @@
     // Endless Scrolling
 
     function addESPanel(Heading) {
-        var Context, RecentDiscussions, Container, CommentBox, MainPagination, ESPanel, ESRefresh, Match, URL, NextPage, CurrentPage,
+        var Context, RS, Temp, I, N, RecentDiscussions, Container, CommentBox, MainPagination, ESPanel, ESRefresh, Match, URL, NextPage, CurrentPage,
             Navigation, ESPause, ESStatus;
         Heading.classList.add("ESHeading");
         Context = getESContext(document);
+        RS = GM_getValue("ES_RS");
+        if (RS && Path.match(/^\/discussion\//)) {
+            Temp = document.createDocumentFragment();
+            for (I = 0, N = Context.children.length; I < N; ++I) {
+                Temp.appendChild(Context.lastElementChild);
+            }
+            Context.appendChild(Temp);
+        }
         MainPagination = document.getElementsByClassName("pagination")[0];
         if (Context || MainPagination) {
             RecentDiscussions = document.getElementsByClassName("widget-container--margin-top")[0];
-            if (RecentDiscussions && GM_getValue("ES_RD")) {
+            if (GM_getValue("ES_RD") && RecentDiscussions) {
                 RecentDiscussions.classList.add("ESRecentDiscussions");
                 Container = Heading.parentElement;
                 Container.insertBefore(RecentDiscussions.previousElementSibling, Container.firstElementChild);
@@ -1590,8 +1625,8 @@
                 ESRefresh = ESPanel.lastElementChild;
                 Match = Location.match(/(.+?)(#.+?)?$/)[1].match(/(.+?)(\/search\?(page=(\d+))?(.*))?$/);
                 URL = Match[1] + (Path.match(/^\/$/) ? (SG ? "giveaways/" : "trades/") : "/") + "search?" + (Match[5] ? (Match[5].replace(/^&|&$/g, "") + "&") : "") + "page=";
-                NextPage = Match[4] ? (parseInt(Match[4]) + 1) : 2;
-                CurrentPage = NextPage - 1;
+                NextPage = Match[4] ? (RS ? (parseInt(Match[4]) - 1) : (parseInt(Match[4]) + 1)) : (RS ? 0 : 2);
+                CurrentPage = RS ? (NextPage + 1) : (NextPage - 1);
                 if (Context) {
                     Context.insertAdjacentHTML("afterBegin", "<div id=\"ESPage" + CurrentPage + "\"></div>");
                 } else {
@@ -1607,7 +1642,8 @@
                     MainPagination.remove();
                     MainPagination = Navigation;
                     setESPagination(MainPagination);
-                    if (!MainPagination.lastElementChild.classList.contains(SG ? "is-selected" : "is_selected")) {
+                    if ((RS && !MainPagination.firstElementChild.classList.contains("is-selected")) || (!RS && !MainPagination.lastElementChild.classList.contains(SG ?
+                    "is-selected" : "is_selected"))) {
                         ESPanel.insertAdjacentHTML(
                             "beforeEnd",
                             "<a class=\"ESPause\" title=\"Pause the endless scrolling.\">" +
@@ -1638,7 +1674,7 @@
                     fixFEHeading();
                 }
                 ESRefresh.addEventListener("click", function() {
-                    refreshESPage(ESRefresh, URL + CurrentPage, document.getElementById("ESPage" + CurrentPage));
+                    refreshESPage(ESRefresh, URL + CurrentPage, document.getElementById("ESPage" + CurrentPage), RS);
                 });
             }
         }
@@ -1660,11 +1696,16 @@
                         "<div class=\"page__heading page_heading\">" +
                         "    <div class=\"page__heading__breadcrumbs page_heading_breadcrumbs\">Page " + NextPage + "</div>" +
                         "</div>";
-                    Context.appendChild(getESContent(ResponseHTML));
+                    Context.appendChild(getESContent(ResponseHTML, RS));
                     ESStatus.nextElementSibling.id = "ESPage" + NextPage;
                     Pagination = ResponseHTML.getElementsByClassName(SG ? "pagination__navigation" : "pagination_navigation")[0];
-                    if (Pagination && !Pagination.lastElementChild.classList.contains(SG ? "is-selected" : "is_selected")) {
-                        ++NextPage;
+                    if (Pagination && ((RS && !Pagination.firstElementChild.classList.contains("is-selected")) || (!RS && !Pagination.lastElementChild.classList.contains(SG ?
+                    "is-selected" : "is_selected")))) {
+                        if (RS) {
+                            --NextPage;
+                        } else {
+                            ++NextPage;
+                        }
                         document.addEventListener("scroll", loadESNextPage);
                     }
                     Top = ESStatus.offsetTop - Heading.getElementsByClassName("FEHeadingBackground")[0].offsetHeight;
@@ -1674,7 +1715,11 @@
                     function setESNextPage() {
                         if (window.scrollY > Top) {
                             document.removeEventListener("scroll", setESNextPage);
-                            ++CurrentPage;
+                            if (RS) {
+                                --CurrentPage;
+                            } else {
+                                ++CurrentPage;
+                            }
                             MainPagination.innerHTML = Pagination.innerHTML;
                             setESPagination(MainPagination);
                             document.addEventListener("scroll", setESPreviousPage);
@@ -1684,7 +1729,11 @@
                     function setESPreviousPage() {
                         if (window.scrollY <= Top) {
                             document.removeEventListener("scroll", setESPreviousPage);
-                            --CurrentPage;
+                            if (RS) {
+                                ++CurrentPage;
+                            } else {
+                                --CurrentPage;
+                            }
                             MainPagination.innerHTML = PaginationBackup;
                             setESPagination(MainPagination);
                             document.addEventListener("scroll", setESNextPage);
@@ -1764,7 +1813,7 @@
         });
     }
 
-    function refreshESPage(Context, URL, Container) {
+    function refreshESPage(Context, URL, Container, RS) {
         Context.innerHTML = "<i class=\"fa fa-refresh fa-spin\"></i>";
         makeRequest(null, URL, Context, function(Response) {
             var Sibling;
@@ -1774,12 +1823,12 @@
                     Sibling.remove();
                 }
             } while (Sibling && !Sibling.classList.contains("ESStatus"));
-            Container.parentElement.insertBefore(getESContent(parseHTML(Response.responseText)), Sibling);
+            Container.parentElement.insertBefore(getESContent(parseHTML(Response.responseText), RS), Sibling);
             Context.innerHTML = "<i class=\"fa fa-refresh\"></i>";
         });
     }
 
-    function getESContent(Response) {
+    function getESContent(Response, RS) {
         var Context, ESContext, I, N, DocumentFragment;
         Context = getESContext(Response);
         ESContext = document.getElementsByClassName("ESContext")[0];
@@ -1794,7 +1843,7 @@
             loadEndlessFeatures(Context);
             setESHide(Context);
             for (I = 0, N = Context.children.length; I < N; ++I) {
-                DocumentFragment.appendChild(Context.firstElementChild);
+                DocumentFragment.appendChild(Context[RS ? "lastElementChild" : "firstElementChild"]);
             }
         }
         return DocumentFragment;
@@ -2637,8 +2686,6 @@
 
     // Not Activated / Multiple Wins Checker
 
-    setNAMWCColors();
-
     function addNAMWCProfileButton(Context, Username, ID, SteamID64) {
         var Matches, I, N;
         Matches = Context.getElementsByClassName("featured__table__row__left");
@@ -2967,29 +3014,6 @@
                 Matches[I].title = Title;
             }
         }
-    }
-
-    function setNAMWCColors() {
-        var Temp;
-        document.body.insertAdjacentHTML(
-            "beforeEnd",
-            "<span class=\"author_small\">" +
-            "    <span class=\"giveaway__column--positive is_positive\"></span>" +
-            "    <span class=\"giveaway__column--negative is_negative\"></span>" +
-            "</span>"
-        );
-        Temp = document.body.lastElementChild;
-        GM_addStyle(
-            ".NAMWCPositive {" +
-            "    color: " + window.getComputedStyle(Temp.firstElementChild).color + " !important;" +
-            "    font-weight: bold;" +
-            "}" +
-            ".NAMWCNegative {" +
-            "    color: " + window.getComputedStyle(Temp.lastElementChild).color + " !important;" +
-            "    font-weight: bold;" +
-            "}"
-        );
-        Temp.remove();
     }
 
     // Not Received Finder
@@ -3618,19 +3642,74 @@
         }
     }
 
+    // Entered Games Highlighter
+
+    function setEGHHighlighter() {
+        var EnterButton, Context;
+        EnterButton = document.getElementsByClassName("sidebar__entry-insert")[0];
+        if (EnterButton) {
+            Context = document.getElementsByClassName("featured__heading")[0];
+            EnterButton.addEventListener("click", function() {
+                saveEGHGame(Context);
+            });
+        }
+    }
+
+    function saveEGHGame(Context) {
+        var Game, SavedGames;
+        Game = Context.querySelector("[href*='store.steampowered.com']").getAttribute("href").match(/\d+/)[0];
+        SavedGames = GM_getValue("Games");
+        if (SavedGames[Game]) {
+            SavedGames[Game].Entered = true;
+            GM_setValue("Games", SavedGames);
+        } else {
+            SavedGames[Game] = {
+                Entered: true
+            };
+            GM_setValue("Games", SavedGames);
+        }
+    }
+
+    function highlightEGHGame(Game, Matches) {
+        var SavedGames, I, N;
+        SavedGames = GM_getValue("Games");
+        if (SavedGames[Game] && SavedGames[Game].Entered) {
+            for (I = 0, N = Matches.length; I < N; ++I) {
+                Matches[I].closest(".featured__summary, .giveaway__row-inner-wrap, .table__row-inner-wrap")
+                    .querySelector(".featured__heading, .giveaway__heading, .table__column--width-fill p").insertAdjacentHTML(
+                    "afterBegin",
+                    "<i class=\"fa fa-star EGHIcon\" title=\"You have entered giveaways for this game before.\"></i>"
+                );
+            }
+        }
+    }
+
+    // Entered Giveaways Filter
+
+    function hideEGFGiveaway(Context) {
+        Context.parentElement.classList.add("rhHidden");
+    }
+
     // Enter Giveaway Button
 
     function addEGBPanel(Context) {
-        var EGBPanel, EGBButton, Columns, XSRFToken, Title, URL, Code, Entries, Points, EGBDescription;
+        var Columns, Links, EGBPanel, EGBButton, XSRFToken, Title, URL, Code, Entries, Points, EGBDescription;
         Columns = Context.getElementsByClassName("giveaway__columns")[0];
-        Columns.insertAdjacentHTML(
+        Links = Context.getElementsByClassName("giveaway__links")[0];
+        Links.classList.add("EGBLinks");
+        Links.insertAdjacentHTML("afterEnd", "<div class=\"giveaway__columns EGBPanel\"></div>");
+        EGBPanel = Links.nextElementSibling;
+        while (!Columns.lastElementChild.classList.contains("giveaway__column--width-fill")) {
+            EGBPanel.insertBefore(Columns.lastElementChild, EGBPanel.firstElementChild);
+        }
+        EGBPanel.insertAdjacentHTML(
             "afterBegin",
             "<div class=\"EGBButton\"></div>" +
             "<a class=\"EGBDescription\" title=\"Read giveaway description.\">" +
             "    <i class=\"fa fa-file-text\"></i>" +
             "</a>"
         );
-        EGBButton = Columns.firstElementChild;
+        EGBButton = EGBPanel.firstElementChild;
         XSRFToken = document.querySelector("[name='xsrf_token']").value;
         Title = Context.getElementsByClassName("giveaway__heading__name")[0];
         URL = Title.getAttribute("href");
@@ -3639,60 +3718,111 @@
         Entries = Context.getElementsByClassName("giveaway__links")[0].firstElementChild.lastElementChild;
         Points = document.getElementsByClassName("nav__points")[0];
         EGBDescription = EGBButton.nextElementSibling;
-        EGBDescription.addEventListener("click", function() {
-            displayEGBDescription(EGBDescription, URL, Title);
-        });
         if (Context.classList.contains("is-faded")) {
-            setEGBButton(EGBButton, "fa-minus-circle", "Leave", "Leaving...", XSRFToken, "entry_delete", Code, Context, Entries, Points, EGBDescription, URL, Title);
+            setEGBButton("fa-minus-circle", "Leave", "Leaving...", "entry_delete");
         } else {
-            setEGBButton(EGBButton, "fa-plus-circle", "Enter", "Entering...", XSRFToken, "entry_insert", Code, Context, Entries, Points, EGBDescription, URL, Title);
+            setEGBButton("fa-plus-circle", "Enter", "Entering...", "entry_insert");
+        }
+        EGBDescription.addEventListener("click", function() {
+            displayEGBDescription();
+        });
+
+        function setEGBButton(DefaultIcon, DefaultName, Message, Type) {
+            createButton(EGBButton, DefaultIcon, DefaultName, "fa-circle-o-notch fa-spin", Message, function(Callback) {
+                makeRequest("xsrf_token=" + XSRFToken + "&do=" + Type + "&code=" + Code, "/ajax.php", null, function(Response) {
+                    var ResponseJSON, SavedGames;
+                    ResponseJSON = parseJSON(Response.responseText);
+                    if (ResponseJSON.type == "success") {
+                        Context.classList.toggle("is-faded");
+                        Entries.textContent = ResponseJSON.entry_count + " entries";
+                        Points.textContent = ResponseJSON.points;
+                        if (Context.classList.contains("is-faded")) {
+                            if (GM_getValue("EGB_D")) {
+                                displayEGBDescription();
+                            }
+                            if (GM_getValue("EGH")) {
+                                saveEGHGame(Context);
+                            }
+                            setEGBButton("fa-minus-circle", "Leave", "Leaving...", "entry_delete");
+                        } else {
+                            setEGBButton("fa-plus-circle", "Enter", "Entering...", "entry_insert");
+                        }
+                    } else {
+                        Points.textContent = ResponseJSON.points;
+                        EGBButton.innerHTML =
+                            "<div class=\"sidebar__error is-disabled\">" +
+                            "    <i class=\"fa fa-exclamation-circle\"></i> " +
+                            "    <span>" + ResponseJSON.msg + "</span>" +
+                            "</div>";
+                        Callback();
+                    }
+                });
+            }, null, false, Context.classList.contains("is-faded") ? true : false);
+        }
+
+        function displayEGBDescription() {
+            EGBDescription.innerHTML = "<i class=\"fa fa-circle-o-notch fa-spin\"></i>";
+            makeRequest(null, URL, null, function(Response) {
+                var Description, Popup;
+                EGBDescription.innerHTML = "<i class=\"fa fa-file-text\"></i>";
+                Description = parseHTML(Response.responseText).getElementsByClassName("page__description")[0];
+                if (Description || GM_getValue("EGB_C")) {
+                    Popup = createPopup(true);
+                    Popup.Popup.classList.add("EGBDescriptionPopup");
+                    Popup.Icon.classList.add("fa-file-text");
+                    Popup.Title.innerHTML = "<span><a href=\"" + URL + "\">" + Title + "</a></span>";
+                    Popup.TextArea.classList.remove("rhHidden");
+                    if (GM_getValue("CFH")) {
+                        addCFHPanel(Popup.TextArea);
+                    }
+                    if (Description) {
+                        Popup.Description.insertBefore(Description, Popup.Description.firstElementChild);
+                    }
+                    createButton(Popup.Button, "fa-send", "Submit Comment", "fa-circle-o-notch fa-spin", "Saving...", function(Callback) {
+                        saveComment(XSRFToken, "", "", Popup.TextArea.value, URL, Popup.Progress, Callback, function() {
+                            makeRequest(null, URL, Popup.Progress, function(Response) {
+                                Links.firstElementChild.nextElementSibling.lastElementChild.textContent =
+                                    parseHTML(Response.responseText).getElementsByClassName("sidebar__navigation__item__count")[0].textContent + " comments";
+                                Popup.Close.click();
+                            });
+                        });
+                    });
+                    Popup.popUp(function() {
+                        Popup.TextArea.focus();
+                    });
+                }
+            });
         }
     }
 
-    function setEGBButton(EGBButton, DefaultIcon, DefaultName, Message, XSRFToken, Type, Code, Context, Entries, Points, EGBDescription, URL, Title) {
-        createButton(EGBButton, DefaultIcon, DefaultName, "fa-circle-o-notch fa-spin", Message, function(Callback) {
-            makeRequest("xsrf_token=" + XSRFToken + "&do=" + Type + "&code=" + Code, "/ajax.php", null, function(Response) {
-                var ResponseJSON;
-                ResponseJSON = parseJSON(Response.responseText);
-                if (ResponseJSON.type == "success") {
-                    Context.classList.toggle("is-faded");
-                    Entries.textContent = ResponseJSON.entry_count + " entries";
-                    Points.textContent = ResponseJSON.points;
-                    if (Context.classList.contains("is-faded")) {
-                        if (GM_getValue("EGB_D")) {
-                            displayEGBDescription(EGBDescription, URL, Title);
-                        }
-                        setEGBButton(EGBButton, "fa-minus-circle", "Leave", "Leaving...", XSRFToken, "entry_delete", Code, Context, Entries, Points, EGBDescription, URL, Title);
-                    } else {
-                        setEGBButton(EGBButton, "fa-plus-circle", "Enter", "Entering...", XSRFToken, "entry_insert", Code, Context, Entries, Points, EGBDescription, URL, Title);
-                    }
-                } else {
-                    Points.textContent = ResponseJSON.points;
-                    EGBButton.innerHTML =
-                        "<div class=\"sidebar__error is-disabled\">" +
-                        "    <i class=\"fa fa-exclamation-circle\"></i> " +
-                        "    <span>" + ResponseJSON.msg + "</span>" +
-                        "</div>";
-                    Callback();
-                }
-            });
-        }, null, false, Context.classList.contains("is-faded") ? true : false);
-    }
+    // Discussions Highlighter
 
-    function displayEGBDescription(EGBDescription, URL, Title) {
-        EGBDescription.innerHTML = "<i class=\"fa fa-circle-o-notch fa-spin\"></i>";
-        makeRequest(null, URL, null, function(Response) {
-            var Popup, Description;
-            EGBDescription.innerHTML = "<i class=\"fa fa-file-text\"></i>";
-            Description = parseHTML(Response.responseText).getElementsByClassName("page__description")[0];
-            if (Description) {
-                Popup = createPopup(true);
-                Popup.Popup.classList.add("EGBDescriptionPopup");
-                Popup.Icon.classList.add("fa-file-text");
-                Popup.Title.innerHTML = "<span>" + Title + "</span> Description";
-                Popup.Description.appendChild(Description);
-                Popup.popUp();
-            }
+    function highlightDHDiscussion(Context) {
+        var Comments, Key, Container, DHIcon;
+        Comments = GM_getValue("Comments");
+        Key = Context.getElementsByClassName("table__column__heading")[0].getAttribute("href").match(/\/discussion\/(.+?)\//)[1];
+        if (!Comments[Key]) {
+            Comments[Key] = {
+                Highlighted: false
+            };
+            GM_setValue("Comments", Comments);
+        }
+        Container = Context.getElementsByClassName("table__column--width-fill")[0].firstElementChild;
+        if (Comments[Key].Highlighted) {
+            Context.classList.add("DHHighlight");
+            Container.insertAdjacentHTML("afterBegin", "<i class=\"fa fa-star-o DHIcon\" title=\"Unhighlight discussion.\"></i>");
+        } else {
+            Container.insertAdjacentHTML("afterBegin", "<i class=\"fa fa-star DHIcon\" title=\"Highlight discussion.\"></i>");
+        }
+        DHIcon = Container.firstElementChild;
+        DHIcon.addEventListener("click", function() {
+            DHIcon.classList.toggle("fa-star");
+            DHIcon.classList.toggle("fa-star-o");
+            DHIcon.title = DHIcon.classList.contains("fa-star") ? "Highlight discussion." : "Unhighlight discussion.";
+            Context.classList.toggle("DHHighlight");
+            Comments = GM_getValue("Comments");
+            Comments[Key].Highlighted = Comments[Key].Highlighted ? false : true;
+            GM_setValue("Comments", Comments);
         });
     }
 
@@ -3721,7 +3851,7 @@
                             Comments[Key] = {};
                         }
                         delete Comments[Key].Count;
-                        Read = Object.keys(Comments[Key]).length - 2;
+                        Read = Object.keys(Comments[Key]).length - 3;
                         if (Read < 0) {
                             Read = 0;
                         }
@@ -12040,6 +12170,18 @@
     // Styles
 
     function addStyles() {
+        var Temp, Positive, Negative;
+        document.body.insertAdjacentHTML(
+            "beforeEnd",
+            "<span class=\"author_small\">" +
+            "    <span class=\"giveaway__column--positive is_positive\"></span>" +
+            "    <span class=\"giveaway__column--negative is_negative\"></span>" +
+            "</span>"
+        );
+        Temp = document.body.lastElementChild;
+        Positive = window.getComputedStyle(Temp.firstElementChild).color;
+        Negative = window.getComputedStyle(Temp.lastElementChild).color;
+        Temp.remove();
         GM_addStyle(
             ".comment {" +
             "    word-break: break-word;" +
@@ -12227,7 +12369,7 @@
             "    margin: 0 0 0 5px;" +
             "    text-decoration: none !important;" +
             "}" +
-            ".author_name + .PUTButton {" +
+            ".author_name + .PUTButton, .EGHIcon {" +
             "    margin: 0 5px 0 0;" +
             "}" +
             ".PUTTags, .GTTags {" +
@@ -12243,6 +12385,14 @@
             "}" +
             ".PUTTags >:not(:first-child), .CTPanel >:not(:first-child), .GTTags >:not(:first-child) {" +
             "    margin: 0 0 0 5px;" +
+            "}" +
+            ".NAMWCPositive {" +
+            "    color: " + Positive + " !important;" +
+            "    font-weight: bold;" +
+            "}" +
+            ".NAMWCNegative {" +
+            "    color: " + Negative + " !important;" +
+            "    font-weight: bold;" +
             "}" +
             ".APBox .featured__outer-wrap {" +
             "    padding: 5px;" +
@@ -12285,6 +12435,14 @@
             "    padding: 0 5px;" +
             "    width: 50px;" +
             "}" +
+            ".EGBLinks {" +
+            "    float: left;" +
+            "    margin: 2px;" +
+            "}" +
+            ".EGBPanel {" +
+            "    float: right;" +
+            "    margin: 2px;" +
+            "}" +
             ".EGBButton {" +
             "    background: none;" +
             "    border: 0;" +
@@ -12296,9 +12454,17 @@
             "    margin: 0;" +
             "}" +
             ".EGBDescriptionPopup {" +
-            "    height: 75%;" +
             "    overflow: auto;" +
-            "    width: 75%;" +
+            "    max-height: 75%;" +
+            "    max-width: 75%;" +
+            "    min-width: 600px;" +
+            "}" +
+            ".DHHighlight {" +
+            "    background-color: " + Positive.replace(/rgb/, "rgba").replace(/\)/, ", 0.2)") + ";" +
+            "}" +
+            ".DHIcon {" +
+            "    cursor: pointer;" +
+            "    margin: 0 5px 0 0;" +
             "}" +
             ".CTButton {" +
             "    cursor: pointer;" +
