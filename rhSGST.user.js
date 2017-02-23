@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.4
+// @version 4.4.1
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -452,7 +452,7 @@
                     addGTTags(Game, SavedGames[Game].Tags);
                 }
                 if (GM_getValue("EGH") && SavedGames[Game].Entered) {
-                    highlightEGHGame(Game, CurrentGames[Game]);
+                    highlightEGHGame(SavedGames, Game, CurrentGames[Game]);
                 }
             }
         }
@@ -504,7 +504,8 @@
         }, {
             Check: GM_getValue("DH") && Path.match(/^\/discussions/),
             Query: ".table__row-outer-wrap",
-            Callback: highlightDHDiscussion
+            Callback: highlightDHDiscussions,
+            All: true
         }, {
             Check: GM_getValue("CT"),
             Query: ".table__column__heading, .giveaway__heading__name, .column_flex h3 a",
@@ -3670,9 +3671,8 @@
         }
     }
 
-    function highlightEGHGame(Game, Matches) {
-        var SavedGames, I, N;
-        SavedGames = GM_getValue("Games");
+    function highlightEGHGame(SavedGames, Game, Matches) {
+        var I, N;
         if (SavedGames[Game] && SavedGames[Game].Entered) {
             for (I = 0, N = Matches.length; I < N; ++I) {
                 Matches[I].closest(".featured__summary, .giveaway__row-inner-wrap, .table__row-inner-wrap")
@@ -3797,25 +3797,31 @@
 
     // Discussions Highlighter
 
-    function highlightDHDiscussion(Context) {
-        var Comments, Key, Container, DHIcon;
+    function highlightDHDiscussions(Matches) {
+        var Comments, I, N, Key, Container;
         Comments = GM_getValue("Comments");
-        Key = Context.getElementsByClassName("table__column__heading")[0].getAttribute("href").match(/\/discussion\/(.+?)\//)[1];
-        if (!Comments[Key]) {
-            Comments[Key] = {
-                Highlighted: false
-            };
-            GM_setValue("Comments", Comments);
+        for (I = 0, N = Matches.length; I < N; ++I) {
+            Key = Matches[I].getElementsByClassName("table__column__heading")[0].getAttribute("href").match(/\/discussion\/(.+?)\//)[1];
+            if (!Comments[Key]) {
+                Comments[Key] = {
+                    Highlighted: false
+                };
+            }
+            Container = Matches[I].getElementsByClassName("table__column--width-fill")[0].firstElementChild;
+            if (Comments[Key].Highlighted) {
+                Matches[I].classList.add("DHHighlight");
+                Container.insertAdjacentHTML("afterBegin", "<i class=\"fa fa-star-o DHIcon\" title=\"Unhighlight discussion.\"></i>");
+            } else {
+                Container.insertAdjacentHTML("afterBegin", "<i class=\"fa fa-star DHIcon\" title=\"Highlight discussion.\"></i>");
+            }
+            setDHIcon(Container.firstElementChild, Matches[I], Key);
         }
-        Container = Context.getElementsByClassName("table__column--width-fill")[0].firstElementChild;
-        if (Comments[Key].Highlighted) {
-            Context.classList.add("DHHighlight");
-            Container.insertAdjacentHTML("afterBegin", "<i class=\"fa fa-star-o DHIcon\" title=\"Unhighlight discussion.\"></i>");
-        } else {
-            Container.insertAdjacentHTML("afterBegin", "<i class=\"fa fa-star DHIcon\" title=\"Highlight discussion.\"></i>");
-        }
-        DHIcon = Container.firstElementChild;
+        GM_setValue("Comments", Comments);
+    }
+
+    function setDHIcon(DHIcon, Context, Key) {
         DHIcon.addEventListener("click", function() {
+            var Comments;
             DHIcon.classList.toggle("fa-star");
             DHIcon.classList.toggle("fa-star-o");
             DHIcon.title = DHIcon.classList.contains("fa-star") ? "Highlight discussion." : "Unhighlight discussion.";
@@ -12183,7 +12189,7 @@
         Negative = window.getComputedStyle(Temp.lastElementChild).color;
         Temp.remove();
         GM_addStyle(
-            ".comment {" +
+            ".markdown {" +
             "    word-break: break-word;" +
             "}" +
             ".rhHidden {" +
