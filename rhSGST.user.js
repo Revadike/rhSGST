@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.6
+// @version 4.6.1
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -3601,24 +3601,37 @@
     // Header Icons Refresher
 
     function setHIRRefresher() {
-        var CreatedIcon, WonIcon, MessagesIcon;
+        var CreatedIcon, WonIcon, MessagesIcon, Interval;
         CreatedIcon = document.getElementsByClassName("nav__right-container")[0].firstElementChild;
         WonIcon = CreatedIcon.nextElementSibling;
         MessagesIcon = WonIcon.nextElementSibling;
-        setInterval(function() {
-            queueRequest({}, null, "/", function(Response) {
-                var Created, Won, Messages;
-                Created = parseHTML(Response.responseText).getElementsByClassName("nav__right-container")[0].firstElementChild;
-                Won = CreatedIcon.nextElementSibling;
-                Messages = WonIcon.nextElementSibling;
-                CreatedIcon.className = Created.className;
-                CreatedIcon.innerHTML = Created.innerHTML;
-                WonIcon.className = Won.className;
-                WonIcon.innerHTML = Won.innerHTML;
-                MessagesIcon.className = Messages.className;
-                MessagesIcon.innerHTML = Messages.innerHTML;
-            });
+        Interval = setInterval(function() {
+            refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon);
         }, 60000);
+        window.addEventListener("focus", function() {
+            refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon);
+            Interval = setInterval(function() {
+                refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon);
+            }, 60000);
+        });
+        window.addEventListener("blur", function() {
+            clearInterval(Interval);
+        });
+    }
+
+    function refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon) {console.log("loading");
+        makeRequest(null, "/", null, function(Response) {
+            var Created, Won, Messages;
+            Created = parseHTML(Response.responseText).getElementsByClassName("nav__right-container")[0].firstElementChild;
+            Won = CreatedIcon.nextElementSibling;
+            Messages = WonIcon.nextElementSibling;
+            CreatedIcon.className = Created.className;
+            CreatedIcon.innerHTML = Created.innerHTML;
+            WonIcon.className = Won.className;
+            WonIcon.innerHTML = Won.innerHTML;
+            MessagesIcon.className = Messages.className;
+            MessagesIcon.innerHTML = Messages.innerHTML;
+        });
     }
 
     // Advanced Giveaway Search
@@ -3699,17 +3712,30 @@
     // Points Refresher
 
     function setPRRefresher() {
-        var XSRFToken, Points;
+        var XSRFToken, Points, Interval;
         XSRFToken = document.querySelector("[name='xsrf_token']");
         if (XSRFToken) {
             XSRFToken = XSRFToken.value;
             Points = document.getElementsByClassName("nav__points")[0];
-            setInterval(function() {
-                queueRequest({}, "xsrf_token=" + XSRFToken + "&do=entry_insert", "/ajax.php", function(Response) {
-                    Points.textContent = parseJSON(Response.responseText).points;
-                });
+            Interval = setInterval(function() {
+                refreshPRPoints(XSRFToken, Points);
             }, 60000);
+            window.addEventListener("focus", function() {
+                refreshPRPoints(XSRFToken, Points);
+                Interval = setInterval(function() {
+                    refreshPRPoints(XSRFToken, Points);
+                }, 60000);
+            });
+            window.addEventListener("blur", function() {
+                clearInterval(Interval);
+            });
         }
+    }
+
+    function refreshPRPoints(XSRFToken, Points) {
+        makeRequest("xsrf_token=" + XSRFToken + "&do=entry_insert", "/ajax.php", null, function(Response) {
+            Points.textContent = parseJSON(Response.responseText).points;
+        });
     }
 
     // Entered Games Highlighter
@@ -3741,16 +3767,24 @@
     }
 
     function highlightEGHGame(SavedGames, Game, Matches) {
-        var I, N;
+        var I, N, Context;
         if (SavedGames[Game] && SavedGames[Game].Entered) {
             for (I = 0, N = Matches.length; I < N; ++I) {
-                Matches[I].closest(".featured__summary, .giveaway__row-inner-wrap, .table__row-inner-wrap")
-                    .querySelector(".featured__heading, .giveaway__heading, .table__column--width-fill p").insertAdjacentHTML(
-                    "afterBegin",
-                    "<i class=\"fa fa-star EGHIcon\" title=\"You have entered giveaways for this game before.\"></i>"
-                );
+                Context = Matches[I].closest(".featured__summary, .giveaway__row-inner-wrap, .table__row-inner-wrap")
+                    .querySelector(".featured__heading, .giveaway__heading, .table__column--width-fill p");
+                Context.insertAdjacentHTML("afterBegin", "<i class=\"fa fa-star EGHIcon\" title=\"You have entered giveaways for this game before. Click to unhighlight it.\"></i>");
+                setEGHRemove(Context.firstElementChild, Game);
             }
         }
+    }
+
+    function setEGHRemove(EGHIcon, Game) {
+        EGHIcon.addEventListener("click", function() {
+            Games = GM_getValue("Games");
+            Games[Game].Entered = false;
+            GM_setValue("Games", Games);
+            EGHIcon.remove();
+        });
     }
 
     // Entered Giveaways Filter
@@ -3762,7 +3796,7 @@
     // Enter Giveaway Button
 
     function addEGBPanel(Context) {
-        var Columns, Links, EGBPanel, EGBButton, XSRFToken, Title, URL, Code, Entries, Points, EGBDescription;
+        var Columns, Links, EGBPanel, EGBButton, XSRFToken, Title, URL, Username, Code, Entries, Points, EGBDescription;
         Columns = Context.getElementsByClassName("giveaway__columns")[0];
         Links = Context.getElementsByClassName("giveaway__links")[0];
         Links.classList.add("EGBLinks");
@@ -3783,6 +3817,7 @@
         Title = Context.getElementsByClassName("giveaway__heading__name")[0];
         URL = Title.getAttribute("href");
         Title = Title.textContent;
+        Username = Context.getElementsByClassName("giveaway__username")[0].textContent;
         Code = URL.match(/\/giveaway\/(.+?)\//)[1];
         Entries = Context.getElementsByClassName("giveaway__links")[0].firstElementChild.lastElementChild;
         Points = document.getElementsByClassName("nav__points")[0];
@@ -3839,7 +3874,7 @@
                     Popup = createPopup(true);
                     Popup.Popup.classList.add("EGBDescriptionPopup");
                     Popup.Icon.classList.add("fa-file-text");
-                    Popup.Title.innerHTML = "<span><a href=\"" + URL + "\">" + Title + "</a></span>";
+                    Popup.Title.innerHTML = "<span><a href=\"" + URL + "\">" + Title + "</a></span> by <a href=\"/user/" + Username + "\">" + Username + "</a>";
                     Popup.TextArea.classList.remove("rhHidden");
                     if (GM_getValue("CFH")) {
                         addCFHPanel(Popup.TextArea);
@@ -12447,7 +12482,7 @@
             "    margin: 0 0 0 5px;" +
             "    text-decoration: none !important;" +
             "}" +
-            ".author_name + .PUTButton, .EGHIcon {" +
+            ".author_name + .PUTButton {" +
             "    margin: 0 5px 0 0;" +
             "}" +
             ".PUTTags, .GTTags {" +
@@ -12512,6 +12547,10 @@
             ".AGSPanel input, .AGSPanel select {" +
             "    padding: 0 5px;" +
             "    width: 50px;" +
+            "}" +
+            ".EGHIcon {" +
+            "    cursor: pointer;" +
+            "    margin: 0 5px 0 0;" +
             "}" +
             ".EGBLinks {" +
             "    float: left;" +
