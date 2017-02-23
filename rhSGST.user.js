@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.6.1
+// @version 4.6.2
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -3619,12 +3619,12 @@
         });
     }
 
-    function refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon) {console.log("loading");
+    function refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon) {
         makeRequest(null, "/", null, function(Response) {
             var Created, Won, Messages;
             Created = parseHTML(Response.responseText).getElementsByClassName("nav__right-container")[0].firstElementChild;
-            Won = CreatedIcon.nextElementSibling;
-            Messages = WonIcon.nextElementSibling;
+            Won = Created.nextElementSibling;
+            Messages = Won.nextElementSibling;
             CreatedIcon.className = Created.className;
             CreatedIcon.innerHTML = Created.innerHTML;
             WonIcon.className = Won.className;
@@ -12297,7 +12297,7 @@
         Temp.remove();
         GM_addStyle(
             ".markdown {" +
-            "    word-break: break-word;" +
+            "    word-break: break-all;" +
             "}" +
             ".rhHidden {" +
             "    display: none !important;" +
