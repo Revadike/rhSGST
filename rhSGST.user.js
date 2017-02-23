@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.7.1
+// @version 4.7.2
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -1637,16 +1637,15 @@
             Navigation, ESPause, ESStatus;
         Heading.classList.add("ESHeading");
         Context = getESContext(document);
-        RS = !GM_getValue("ES_RS") && Path.match(/^\/discussion\//);
-        if (RS) {
-            Temp = document.createDocumentFragment();
-            for (I = 0, N = Context.children.length; I < N; ++I) {
-                Temp.appendChild(Context.lastElementChild);
+        if (Context || (typeof Context == "undefined")) {
+            RS = !GM_getValue("ES_RS") && Path.match(/^\/discussion\//);
+            if (RS) {
+                Temp = document.createDocumentFragment();
+                for (I = 0, N = Context.children.length; I < N; ++I) {
+                    Temp.appendChild(Context.lastElementChild);
+                }
+                Context.appendChild(Temp);
             }
-            Context.appendChild(Temp);
-        }
-        MainPagination = document.getElementsByClassName("pagination")[0];
-        if (Context || MainPagination) {
             RecentDiscussions = document.getElementsByClassName("widget-container--margin-top")[0];
             if (GM_getValue("ES_RD") && RecentDiscussions) {
                 RecentDiscussions.classList.add("ESRecentDiscussions");
@@ -1654,6 +1653,7 @@
                 Container.insertBefore(RecentDiscussions.previousElementSibling, Container.firstElementChild);
                 Container.insertBefore(RecentDiscussions, Container.firstElementChild.nextElementSibling);
             }
+            MainPagination = document.getElementsByClassName("pagination")[0];
             CommentBox = document.getElementsByClassName(SG ? "comment comment--submit" : "reply_form")[0];
             if (CommentBox && !CommentBox.classList.contains("is_hidden")) {
                 Heading.insertAdjacentHTML(
@@ -1666,7 +1666,6 @@
                 Heading.nextElementSibling.appendChild(CommentBox);
             }
             if (MainPagination) {
-                Navigation = MainPagination.getElementsByClassName(SG ? "pagination__navigation" : "pagination_navigation")[0];
                 Heading.insertAdjacentHTML("beforeEnd", "<div class=\"page_heading_btn ESPanel\"></div>");
                 ESPanel = Heading.lastElementChild;
                 ESPanel.insertAdjacentHTML(
@@ -1690,6 +1689,7 @@
                         "</div>"
                     );
                 }
+                Navigation = MainPagination.getElementsByClassName(SG ? "pagination__navigation" : "pagination_navigation")[0];
                 if (Navigation) {
                     ESPanel.insertBefore(Navigation, ESPanel.firstElementChild);
                     MainPagination.remove();
