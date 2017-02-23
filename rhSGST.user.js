@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.7
+// @version 4.7.1
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -514,6 +514,10 @@
             Query: ".global__image-outer-wrap--avatar-small",
             Callback: addAPBox
         }, {
+            Check: GM_getValue("AP") || GM_getValue("GGP"),
+            Query: ".giveaway__row-inner-wrap.is-faded",
+            Callback: setEnteredHover
+        }, {
             Check: GM_getValue("EGF"),
             Query: ".giveaway__row-inner-wrap.is-faded",
             Callback: hideEGFGiveaway
@@ -1018,6 +1022,15 @@
         });
         Element.addEventListener("mouseleave", function() {
             Element.style.opacity = LeaveOpacity;
+        });
+    }
+
+    function setEnteredHover(Context) {
+        Context.addEventListener("mouseenter", function() {
+            Context.classList.remove("is-faded");
+        });
+        Context.addEventListener("mouseleave", function() {
+            Context.classList.add("is-faded");
         });
     }
 
@@ -3748,12 +3761,14 @@
             Points.textContent = NumPoints;
             Matches = document.getElementsByClassName("EGBButton");
             for (I = 0, N = Matches.length; I < N; ++I) {
-                if (parseInt(Matches[I].getAttribute("data-points")) <= NumPoints) {
-                    Matches[I].classList.remove("rhHidden");
-                    Matches[I].nextElementSibling.classList.add("rhHidden");
-                } else {
-                    Matches[I].classList.add("rhHidden");
-                    Matches[I].nextElementSibling.classList.remove("rhHidden");
+                if (!Matches[I].getAttribute("data-entered")) {
+                    if (parseInt(Matches[I].getAttribute("data-points")) <= NumPoints) {
+                        Matches[I].classList.remove("rhHidden");
+                        Matches[I].nextElementSibling.classList.add("rhHidden");
+                    } else {
+                        Matches[I].classList.add("rhHidden");
+                        Matches[I].nextElementSibling.classList.remove("rhHidden");
+                    }
                 }
             }
         });
@@ -3861,6 +3876,7 @@
             EGBButton.classList.add("rhHidden");
         }
         if (Context.classList.contains("is-faded")) {
+            EGBButton.setAttribute("data-entered", true);
             setEGBButton("fa-minus-circle", "Leave", "Leaving...", "entry_delete");
         } else {
             setEGBButton("fa-plus-circle", "Enter", "Entering...", "entry_insert");
@@ -3885,8 +3901,10 @@
                             if (GM_getValue("EGH")) {
                                 saveEGHGame(Context);
                             }
+                            EGBButton.setAttribute("data-entered", true);
                             setEGBButton("fa-minus-circle", "Leave", "Leaving...", "entry_delete");
                         } else {
+                            EGBButton.removeAttribute("data-entered");
                             setEGBButton("fa-plus-circle", "Enter", "Entering...", "entry_insert");
                         }
                     } else {
@@ -12652,6 +12670,7 @@
             ".GGPBox {" +
             "    line-height: normal;" +
             "    max-height: 300px;" +
+            "    opacity: 1 !important;" +
             "    overflow: auto;" +
             "    width: 400px;" +
             "}" +
