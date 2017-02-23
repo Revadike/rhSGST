@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.6.2.1
+// @version 4.7
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -142,6 +142,9 @@
             EGB_C: {
                 Name: "Pop up the box to add a comment to the giveaway even if it doesn't have any description."
             }
+        },
+        GGP: {
+            Name: "Giveaway Groups Popout"
         },
         DH: {
             Name: "Discussions Highlighter"
@@ -514,6 +517,10 @@
             Check: GM_getValue("EGF"),
             Query: ".giveaway__row-inner-wrap.is-faded",
             Callback: hideEGFGiveaway
+        }, {
+            Check: GM_getValue("GGP"),
+            Query: ".giveaway__column--group",
+            Callback: addGGPBox
         }, {
             Check: GM_getValue("EGB") && Path.match(/^\/($|giveaways)/),
             Query: ".giveaway__row-inner-wrap",
@@ -3736,7 +3743,19 @@
 
     function refreshPRPoints(XSRFToken, Points) {
         makeRequest("xsrf_token=" + XSRFToken + "&do=entry_insert", "/ajax.php", null, function(Response) {
-            Points.textContent = parseJSON(Response.responseText).points;
+            var NumPoints, Matches, I, N, Context;
+            NumPoints = parseJSON(Response.responseText).points;
+            Points.textContent = NumPoints;
+            Matches = document.getElementsByClassName("EGBButton");
+            for (I = 0, N = Matches.length; I < N; ++I) {
+                if (parseInt(Matches[I].getAttribute("data-points")) <= NumPoints) {
+                    Matches[I].classList.remove("rhHidden");
+                    Matches[I].nextElementSibling.classList.add("rhHidden");
+                } else {
+                    Matches[I].classList.add("rhHidden");
+                    Matches[I].nextElementSibling.classList.remove("rhHidden");
+                }
+            }
         });
     }
 
@@ -3798,7 +3817,7 @@
     // Enter Giveaway Button
 
     function addEGBPanel(Context) {
-        var Columns, Links, EGBPanel, EGBButton, XSRFToken, Title, URL, Username, Code, Entries, Points, EGBDescription;
+        var Columns, Links, EGBPanel, EGBButton, XSRFToken, Title, URL, EntryPoints, Username, Code, Entries, Points, EGBDescription;
         Columns = Context.getElementsByClassName("giveaway__columns")[0];
         Links = Context.getElementsByClassName("giveaway__links")[0];
         Links.classList.add("EGBLinks");
@@ -3818,12 +3837,29 @@
         XSRFToken = document.querySelector("[name='xsrf_token']").value;
         Title = Context.getElementsByClassName("giveaway__heading__name")[0];
         URL = Title.getAttribute("href");
+        EntryPoints = Title.parentElement.getElementsByClassName("giveaway__heading__thin");
+        EntryPoints = parseInt(EntryPoints[EntryPoints.length - 1].textContent.match(/\d+/)[0]);
+        EGBButton.setAttribute("data-points", EntryPoints);
         Title = Title.textContent;
         Username = Context.getElementsByClassName("giveaway__username")[0].textContent;
         Code = URL.match(/\/giveaway\/(.+?)\//)[1];
         Entries = Context.getElementsByClassName("giveaway__links")[0].firstElementChild.lastElementChild;
         Points = document.getElementsByClassName("nav__points")[0];
         EGBDescription = EGBButton.nextElementSibling;
+        EGBButton.insertAdjacentHTML(
+            "afterEnd",
+            "<div>" +
+            "    <div class=\"sidebar__error is-disabled\">" +
+            "        <i class=\"fa fa-exclamation-circle\"></i> " +
+            "        <span>Not Enough Points</span>" +
+            "    </div>" +
+            "</div>"
+        );
+        if (EntryPoints <= parseInt(Points.textContent)) {
+            EGBButton.nextElementSibling.classList.add("rhHidden");
+        } else {
+            EGBButton.classList.add("rhHidden");
+        }
         if (Context.classList.contains("is-faded")) {
             setEGBButton("fa-minus-circle", "Leave", "Leaving...", "entry_delete");
         } else {
@@ -3899,6 +3935,58 @@
                 }
             });
         }
+    }
+
+    // Giveaway Groups Popout
+
+    function addGGPBox(Context) {
+        var URL, GGPButton, GGPBox;
+        URL = Context.getAttribute("href");
+        GGPButton = Context;
+        GGPButton.classList.add("GGPButton");
+        GGPButton.removeAttribute("href");
+        GGPButton.insertAdjacentHTML("afterEnd", "<span class=\"giveaway__column--group GGPButtonContainer\" href=\"" + URL + "\">" + GGPButton.outerHTML + "</span>");
+        Context = GGPButton.nextElementSibling;
+        GGPButton.remove();
+        GGPButton = Context.firstElementChild;
+        GGPButton.addEventListener("click", function() {
+            if (GGPBox) {
+                GGPBox.Popout.innerHTML = "";
+            } else {
+                GGPBox = createPopout(Context);
+                GGPBox.Popout.classList.add("GGPBox");
+            }
+            GGPBox.Popout.innerHTML =
+                "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
+                "<span>Loading giveaway groups...</span>";
+            GGPBox.popOut(GGPButton);
+            getGGPGroups(URL + "/search?page=", 1, GGPBox.Popout, [], function(Groups) {
+                var I, N;
+                GGPBox.Popout.innerHTML = "<a class=\"giveaway__heading__name\" href=\"" + URL + "\">Groups</a>";
+                for (I = 0, N = Groups.length; I < N; ++I) {
+                    GGPBox.Popout.appendChild(Groups[I]);
+                }
+                loadEndlessFeatures(GGPBox.Popout);
+                GGPBox.reposition(GGPButton);
+            });
+        });
+    }
+
+    function getGGPGroups(URL, NextPage, Context, Groups, Callback) {
+        makeRequest(null, URL + NextPage, Context, function(Response) {
+            var ResponseHTML, Matches, I, N, Pagination;
+            ResponseHTML = parseHTML(Response.responseText);
+            Matches = ResponseHTML.getElementsByClassName("table__row-outer-wrap");
+            for (I = 0, N = Matches.length; I < N; ++I) {
+                Groups.push(Matches[I]);
+            }
+            Pagination = ResponseHTML.getElementsByClassName("pagination__navigation")[0];
+            if (Pagination && !Pagination.lastElementChild.classList.contains("is-selected")) {
+                getGGPGroups(URL, ++NextPage, Context, Groups, Callback);
+            } else {
+                Callback(Groups);
+            }
+        });
     }
 
     // Discussions Highlighter
@@ -12554,6 +12642,19 @@
             "    cursor: pointer;" +
             "    margin: 0 5px 0 0;" +
             "}" +
+            ".GGPButtonContainer {" +
+            "    padding: 0;" +
+            "}" +
+            ".GGPButton {" +
+            "    cursor: pointer;" +
+            "    padding: 0 8px;" +
+            "}" +
+            ".GGPBox {" +
+            "    line-height: normal;" +
+            "    max-height: 300px;" +
+            "    overflow: auto;" +
+            "    width: 400px;" +
+            "}" +
             ".EGBLinks {" +
             "    float: left;" +
             "    margin: 2px;" +
@@ -12562,13 +12663,13 @@
             "    float: right;" +
             "    margin: 2px;" +
             "}" +
-            ".EGBButton {" +
+            ".EGBButton, .EGBButton + div {" +
             "    background: none;" +
             "    border: 0;" +
             "    box-shadow: none;" +
             "    padding: 0;" +
             "}" +
-            ".EGBButton >* {" +
+            ".EGBButton >*, .EGBButton + div >* {" +
             "    line-height: inherit;" +
             "    margin: 0;" +
             "}" +
