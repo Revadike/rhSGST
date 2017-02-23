@@ -3,12 +3,13 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.4.1
+// @version 4.4.2
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
 // @grant GM_getValue
 // @grant GM_deleteValue
+// @grant GM_listValues
 // @grant GM_xmlhttpRequest
 // @grant GM_addStyle
 // @connect steamgifts.com
@@ -65,7 +66,7 @@
                 Name: "Show recent discussions at the top."
             },
             ES_RS: {
-                Name: "Reverse Scrolling"
+                Name: "Disable reverse scrolling."
             }
         },
         SGPB: {
@@ -1387,11 +1388,14 @@
                     Reader = new FileReader();
                     Reader.readAsText(File);
                     Reader.onload = function() {
+                        var Key;
                         File = parseJSON(Reader.result);
-                        if (File.rhSGST && (File.rhSGST == "Users")) {
+                        if (File.rhSGST && (File.rhSGST == "Data")) {
                             if (window.confirm("Are you sure you want to import this data? Your entire current data will be overwritten. A copy will be downloaded as precaution.")) {
                                 SMExport.click();
-                                GM_setValue("Users", File.Users);
+                                for (Key in File.Data) {
+                                    GM_setValue(Key, File.Data[Key]);
+                                }
                                 window.alert("Imported!");
                             }
                         } else {
@@ -1404,11 +1408,17 @@
             });
         });
         SMExport.addEventListener("click", function() {
-            var File;
+            var File, Values, Data, N, Key;
             File = document.createElement("a");
+            Values = GM_listValues();
+            Data = {};
+            for (I = 0, N = Values.length; I < N; ++I) {
+                Key = Values[I];
+                Data[Key] = GM_getValue(Key);
+            }
             File.href = "data: text/json; charset = utf-8, " + encodeURIComponent(JSON.stringify({
-                rhSGST: "Users",
-                Users: GM_getValue("Users")
+                rhSGST: "Data",
+                Data: Data
             }));
             File.download = "rhSGST.json";
             document.body.appendChild(File);
@@ -1585,8 +1595,8 @@
             Navigation, ESPause, ESStatus;
         Heading.classList.add("ESHeading");
         Context = getESContext(document);
-        RS = GM_getValue("ES_RS");
-        if (RS && Path.match(/^\/discussion\//)) {
+        RS = !GM_getValue("ES_RS") && Path.match(/^\/discussion\//);
+        if (RS) {
             Temp = document.createDocumentFragment();
             for (I = 0, N = Context.children.length; I < N; ++I) {
                 Temp.appendChild(Context.lastElementChild);
