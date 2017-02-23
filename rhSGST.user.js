@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.4.2
+// @version 4.5
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -119,6 +119,9 @@
         },
         AGS: {
             Name: "Advanced Giveaway Search"
+        },
+        PR: {
+            Name: "Points Refresher"
         },
         EGH: {
             Name: "Entered Games Highlighter"
@@ -335,6 +338,9 @@
             addAGSPanel();
         } else if (GM_getValue("EGH") && Path.match(/^\/giveaway\//)) {
             setEGHHighlighter();
+        }
+        if (SG && GM_getValue("PR")) {
+            setPRRefresher();
         }
         Users = {};
         Games = {};
@@ -574,12 +580,15 @@
     }
 
     function goToComment() {
-        var Match, Heading;
+        var Match, Element, Heading;
         Match = window.location.href.match(/#(.+)/);
         if (Match && !Path.match(/^\/account/)) {
-            Heading = document.getElementsByClassName("FEHeading")[0];
-            window.scrollTo(0, document.getElementById(Match[1]).offsetTop - (Heading ? 0 : 39));
-            window.scrollBy(0, -(document.getElementsByTagName("header")[0].offsetHeight + 64));
+            Element = document.getElementById(Match[1]);
+            if (Element) {
+                Heading = document.getElementsByClassName("FEHeading")[0];
+                window.scrollTo(0, Element.offsetTop - (Heading ? 0 : 39));
+                window.scrollBy(0, -(document.getElementsByTagName("header")[0].offsetHeight + 64));
+            }
         }
     }
 
@@ -1408,22 +1417,25 @@
             });
         });
         SMExport.addEventListener("click", function() {
-            var File, Values, Data, N, Key;
+            var File, Values, Data, URL, N, Key;
             File = document.createElement("a");
+            File.download = "rhSGST.json";
             Values = GM_listValues();
             Data = {};
             for (I = 0, N = Values.length; I < N; ++I) {
                 Key = Values[I];
                 Data[Key] = GM_getValue(Key);
             }
-            File.href = "data: text/json; charset = utf-8, " + encodeURIComponent(JSON.stringify({
+            Data = new Blob([JSON.stringify({
                 rhSGST: "Data",
                 Data: Data
-            }));
-            File.download = "rhSGST.json";
+            })]);
+            URL = window.URL.createObjectURL(Data);
+            File.href = URL;
             document.body.appendChild(File);
             File.click();
             File.remove();
+            window.URL.revokeObjectURL(URL);
             window.alert("Exported!");
         });
         SMSyncFrequency.addEventListener("change", function() {
@@ -3653,6 +3665,22 @@
         }
     }
 
+    // Points Refresher
+
+    function setPRRefresher() {
+        var XSRFToken, Points;
+        XSRFToken = document.querySelector("[name='xsrf_token']");
+        if (XSRFToken) {
+            XSRFToken = XSRFToken.value;
+            Points = document.getElementsByClassName("nav__points")[0];
+            setInterval(function() {
+                makeRequest("xsrf_token=" + XSRFToken + "&do=entry_insert", "ajax.php", null, function(Response) {
+                    Points.textContent = parseJSON(Response.responseText).points;
+                });
+            }, 60000);
+        }
+    }
+
     // Entered Games Highlighter
 
     function setEGHHighlighter() {
@@ -3861,7 +3889,8 @@
                         setHoverOpacity(Element, "1", "0.5");
                     }
                     if (Type == "discussion") {
-                        CommentsCount = Matches[I].closest(".table__column--width-fill").nextElementSibling.firstElementChild;
+                        Element = Matches[I].closest(".table__column--width-fill");
+                        CommentsCount = Element.nextElementSibling.firstElementChild;
                         Count = parseInt(CommentsCount.textContent.replace(/,/g, ""));
                         if (!Comments[Key]) {
                             Comments[Key] = {};
@@ -3884,7 +3913,7 @@
                                 "    </a>" +
                                 "</span>"
                             );
-                            setCTPanel(CommentsCount.nextElementSibling, CommentsCount.href, Key);
+                            setCTPanel(CommentsCount.nextElementSibling, CommentsCount.href, Key, Element);
                         }
                     }
                 }
@@ -3892,7 +3921,7 @@
         }
     }
 
-    function setCTPanel(CTPanel, URL, Key) {
+    function setCTPanel(CTPanel, URL, Key, Element) {
         var CTGoToUnread, CTMarkRead;
         CTGoToUnread = CTPanel.firstElementChild;
         CTMarkRead = CTGoToUnread.nextElementSibling;
@@ -3909,6 +3938,8 @@
             markCTDiscussionRead({
                 Progress: CTPanel
             }, URL + "/search?page=", 1, Key, false, function() {
+                Element.style.opacity = "0.5";
+                setHoverOpacity(Element, "1", "0.5");
                 CTPanel.remove();
             });
         });
