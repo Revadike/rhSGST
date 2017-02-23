@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.5
+// @version 4.6
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -116,6 +116,9 @@
         },
         UGS: {
             Name: "Unsent Gifts Sender"
+        },
+        HIR: {
+            Name: "Header Icons Refresher"
         },
         AGS: {
             Name: "Advanced Giveaway Search"
@@ -339,8 +342,13 @@
         } else if (GM_getValue("EGH") && Path.match(/^\/giveaway\//)) {
             setEGHHighlighter();
         }
-        if (SG && GM_getValue("PR")) {
-            setPRRefresher();
+        if (SG) {
+            if (GM_getValue("HIR")) {
+                setHIRRefresher();
+            }
+            if (GM_getValue("PR")) {
+                setPRRefresher();
+            }
         }
         Users = {};
         Games = {};
@@ -603,7 +611,7 @@
                     GM_setValue("LastRequest", 0);
                     Callback(Response);
                 });
-            } else {
+            } else if (Element.Progress) {
                 Element.Progress.innerHTML =
                     "<i class=\"fa fa-clock-o\"></i> " +
                     "<span>Waiting for a free request slot...</span>";
@@ -3590,6 +3598,29 @@
         }
     }
 
+    // Header Icons Refresher
+
+    function setHIRRefresher() {
+        var CreatedIcon, WonIcon, MessagesIcon;
+        CreatedIcon = document.getElementsByClassName("nav__right-container")[0].firstElementChild;
+        WonIcon = CreatedIcon.nextElementSibling;
+        MessagesIcon = WonIcon.nextElementSibling;
+        setInterval(function() {
+            queueRequest({}, null, "/", function(Response) {
+                var Created, Won, Messages;
+                Created = parseHTML(Response.responseText).getElementsByClassName("nav__right-container")[0].firstElementChild;
+                Won = CreatedIcon.nextElementSibling;
+                Messages = WonIcon.nextElementSibling;
+                CreatedIcon.className = Created.className;
+                CreatedIcon.innerHTML = Created.innerHTML;
+                WonIcon.className = Won.className;
+                WonIcon.innerHTML = Won.innerHTML;
+                MessagesIcon.className = Messages.className;
+                MessagesIcon.innerHTML = Messages.innerHTML;
+            });
+        }, 60000);
+    }
+
     // Advanced Giveaway Search
 
     function addAGSPanel() {
@@ -3674,7 +3705,7 @@
             XSRFToken = XSRFToken.value;
             Points = document.getElementsByClassName("nav__points")[0];
             setInterval(function() {
-                makeRequest("xsrf_token=" + XSRFToken + "&do=entry_insert", "ajax.php", null, function(Response) {
+                queueRequest({}, "xsrf_token=" + XSRFToken + "&do=entry_insert", "/ajax.php", function(Response) {
                     Points.textContent = parseJSON(Response.responseText).points;
                 });
             }, 60000);
@@ -3934,12 +3965,12 @@
             });
         });
         CTMarkRead.addEventListener("click", function() {
+            Element.style.opacity = "0.5";
+            setHoverOpacity(Element, "1", "0.5");
             CTPanel.innerHTML = "<i class=\"fa fa-circle-o-notch fa-spin\"></i>";
             markCTDiscussionRead({
                 Progress: CTPanel
             }, URL + "/search?page=", 1, Key, false, function() {
-                Element.style.opacity = "0.5";
-                setHoverOpacity(Element, "1", "0.5");
                 CTPanel.remove();
             });
         });
@@ -12061,7 +12092,7 @@
                     TradeCode = SG ? "" : Response.finalUrl.match(/\/trade\/(.+)\//)[1];
                     ParentID = ResponseHTML.getElementById(CommentURL.match(/\/comment\/(.+)/)[1]);
                     ParentID = SG ? ParentID.closest(".comment").getAttribute("data-comment-id") : ParentID.getAttribute("data-id");
-                    URL = SG ? Response.finalUrl.match(/(.+?)(#.+?)?$/)[1] : "ajax.php";
+                    URL = SG ? Response.finalUrl.match(/(.+?)(#.+?)?$/)[1] : "/ajax.php";
                     saveComment(XSRFToken, TradeCode, ParentID, Description.value, URL, DEDStatus, Callback, DEDCallback);
                 });
             } else {
