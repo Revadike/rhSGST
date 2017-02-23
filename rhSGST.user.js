@@ -3,7 +3,9 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.6.2
+// @version 4.6.2.1
+// @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
+// @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
 // @match https://www.steamtrades.com/*
 // @grant GM_setValue
@@ -12297,7 +12299,7 @@
         Temp.remove();
         GM_addStyle(
             ".markdown {" +
-            "    word-break: break-all;" +
+            "    word-break: break-word;" +
             "}" +
             ".rhHidden {" +
             "    display: none !important;" +
