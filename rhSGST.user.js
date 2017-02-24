@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.7.2
+// @version 4.7.3
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -244,6 +244,9 @@
         },
         AS: {
             Name: "Archive Searcher"
+        },
+        SM_D: {
+            Name: "Enable new features by default."
         }
     };
     if (window.Element && !window.Element.prototype.closest) {
@@ -316,7 +319,7 @@
             if (rhSGST && (typeof rhSGST[Key] != "undefined")) {
                 GM_setValue(Key, rhSGST[Key]);
             } else {
-                GM_setValue(Key, true);
+                GM_setValue(Key, GM_getValue("SM_D") ? true : false);
             }
         }
         for (Key in Feature) {
@@ -513,10 +516,6 @@
             Check: GM_getValue("AP"),
             Query: ".global__image-outer-wrap--avatar-small",
             Callback: addAPBox
-        }, {
-            Check: GM_getValue("AP") || GM_getValue("GGP"),
-            Query: ".giveaway__row-inner-wrap.is-faded",
-            Callback: setEnteredHover
         }, {
             Check: GM_getValue("EGF"),
             Query: ".giveaway__row-inner-wrap.is-faded",
@@ -1022,15 +1021,6 @@
         });
         Element.addEventListener("mouseleave", function() {
             Element.style.opacity = LeaveOpacity;
-        });
-    }
-
-    function setEnteredHover(Context) {
-        Context.addEventListener("mouseenter", function() {
-            Context.classList.remove("is-faded");
-        });
-        Context.addEventListener("mouseleave", function() {
-            Context.classList.add("is-faded");
         });
     }
 
@@ -3876,6 +3866,8 @@
             EGBButton.classList.add("rhHidden");
         }
         if (Context.classList.contains("is-faded")) {
+            Context.classList.remove("is-faded");
+            Context.classList.add("rhFaded");
             EGBButton.setAttribute("data-entered", true);
             setEGBButton("fa-minus-circle", "Leave", "Leaving...", "entry_delete");
         } else {
@@ -3891,10 +3883,13 @@
                     var ResponseJSON, SavedGames;
                     ResponseJSON = parseJSON(Response.responseText);
                     if (ResponseJSON.type == "success") {
-                        Context.classList.toggle("is-faded");
+                        Context.classList.toggle("rhFaded");
                         Entries.textContent = ResponseJSON.entry_count + " entries";
                         Points.textContent = ResponseJSON.points;
-                        if (Context.classList.contains("is-faded")) {
+                        if (EGBButton.getAttribute("data-entered")) {
+                            EGBButton.removeAttribute("data-entered");
+                            setEGBButton("fa-plus-circle", "Enter", "Entering...", "entry_insert");
+                        } else {
                             if (GM_getValue("EGB_D")) {
                                 displayEGBDescription();
                             }
@@ -3903,9 +3898,6 @@
                             }
                             EGBButton.setAttribute("data-entered", true);
                             setEGBButton("fa-minus-circle", "Leave", "Leaving...", "entry_delete");
-                        } else {
-                            EGBButton.removeAttribute("data-entered");
-                            setEGBButton("fa-plus-circle", "Enter", "Entering...", "entry_insert");
                         }
                     } else {
                         Points.textContent = ResponseJSON.points;
@@ -3917,7 +3909,7 @@
                         Callback();
                     }
                 });
-            }, null, false, Context.classList.contains("is-faded") ? true : false);
+            }, null, false, Context.classList.contains("rhFaded") ? true : false);
         }
 
         function displayEGBDescription() {
@@ -3963,7 +3955,7 @@
         GGPButton = Context;
         GGPButton.classList.add("GGPButton");
         GGPButton.removeAttribute("href");
-        GGPButton.insertAdjacentHTML("afterEnd", "<span class=\"giveaway__column--group GGPButtonContainer\" href=\"" + URL + "\">" + GGPButton.outerHTML + "</span>");
+        GGPButton.insertAdjacentHTML("afterEnd", "<span class=\"giveaway__column--group GGPContainer\" href=\"" + URL + "\">" + GGPButton.outerHTML + "</span>");
         Context = GGPButton.nextElementSibling;
         GGPButton.remove();
         GGPButton = Context.firstElementChild;
@@ -12419,6 +12411,9 @@
             ".rhBusy >*, .CFHALIPF {" +
             "    opacity: 0.2;" +
             "}" +
+            ".rhFaded .giveaway__summary >:not(.EGBPanel), .rhFaded .EGBPanel >:not(.GGPContainer), .rhFaded .global__image-outer-wrap--game-medium {" +
+            "    opacity: 0.5;" +
+            "}" +
             ".rhPopup {" +
             "    max-width: none;" +
             "    min-width: 300px;" +
@@ -12660,7 +12655,7 @@
             "    cursor: pointer;" +
             "    margin: 0 5px 0 0;" +
             "}" +
-            ".GGPButtonContainer {" +
+            ".GGPContainer {" +
             "    padding: 0;" +
             "}" +
             ".GGPButton {" +
