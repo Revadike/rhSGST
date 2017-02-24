@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.7.4
+// @version 4.8
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -77,6 +77,9 @@
         STPB: {
             Name: "SteamTrades Profile Button"
         },
+        CH: {
+            Name: "Comment History"
+        },
         UH: {
             Name: "Username History"
         },
@@ -120,13 +123,19 @@
             Name: "Unsent Gifts Sender"
         },
         HIR: {
-            Name: "Header Icons Refresher"
+            Name: "Header Icons Refresher",
+            HIR_B: {
+                Name: "Run in the background and change the icon of the tab if new messages are found."
+            }
         },
         AGS: {
             Name: "Advanced Giveaway Search"
         },
         PR: {
-            Name: "Points Refresher"
+            Name: "Points Refresher",
+            PR_B: {
+                Name: "Run in the background and display the points in the title of the tab upon refreshing."
+            }
         },
         EGH: {
             Name: "Entered Games Highlighter"
@@ -153,6 +162,9 @@
             Name: "Comment Tracker",
             CT_G: {
                 Name: "Fade out visited giveaways."
+            },
+            CT_LU: {
+                Name: "Go to the last unread comment of a discussion instead of the first one from the discussions page."
             }
         },
         AT: {
@@ -297,7 +309,8 @@
             Comments: {},
             Comments_ST: {},
             Emojis: "",
-            Rerolls: []
+            Rerolls: [],
+            CommentHistory: ""
         };
         rhSGST = GM_getValue("rhSGST");
         for (Key in DefaultValues) {
@@ -340,12 +353,12 @@
             loadProfileFeatures(document);
         } else if (Path.match(/^\/support\/tickets\/new/)) {
             setUGSObserver();
-        } else if (GM_getValue("DED") && Path.match(/^\/discussion\//)) {
+        } else if (GM_getValue("DED") && Path.match(/^\/(giveaway|discussion|support\/ticket)\//)) {
             CommentBox = document.getElementsByClassName(SG ? "comment--submit" : "reply_form")[0];
             if (CommentBox) {
                 addDEDButton(CommentBox);
             }
-        } else if (GM_getValue("AGS") && Path.match(/^\/($|giveaways(?!\/(wishlist|created|entered|won)))/)) {
+        } else if (GM_getValue("AGS") && SG && Path.match(/^\/($|giveaways(?!\/(wishlist|created|entered|won)))/)) {
             addAGSPanel();
         } else if (GM_getValue("EGH") && Path.match(/^\/giveaway\//)) {
             setEGHHighlighter();
@@ -402,18 +415,21 @@
         Matches = Context.querySelectorAll("a[href*='/user/']");
         CurrentUsers = {};
         for (I = 0, N = Matches.length; I < N; ++I) {
-            UserID = Matches[I].getAttribute("href").match(/\/user\/(.+)/)[1];
-            if (((SG && Matches[I].textContent == UserID) || (!SG && Matches[I].textContent && !Matches[I].children.length)) && !Matches[I].closest(".markdown")) {
-                if (!Users[UserID]) {
-                    Users[UserID] = [];
-                }
-                if (!CurrentUsers[UserID]) {
-                    CurrentUsers[UserID] = [];
-                }
-                Users[UserID].push(Matches[I]);
-                CurrentUsers[UserID].push(Matches[I]);
-                if (GM_getValue("PUT")) {
-                    addPUTButton(Matches[I], UserID);
+            Match = Matches[I].getAttribute("href").match(/\/user\/(.+)/);
+            if (Match) {
+                UserID = Match[1];
+                if (((SG && Matches[I].textContent == UserID) || (!SG && Matches[I].textContent && !Matches[I].children.length)) && !Matches[I].closest(".markdown")) {
+                    if (!Users[UserID]) {
+                        Users[UserID] = [];
+                    }
+                    if (!CurrentUsers[UserID]) {
+                        CurrentUsers[UserID] = [];
+                    }
+                    Users[UserID].push(Matches[I]);
+                    CurrentUsers[UserID].push(Matches[I]);
+                    if (GM_getValue("PUT")) {
+                        addPUTButton(Matches[I], UserID);
+                    }
                 }
             }
         }
@@ -780,24 +796,26 @@
         Data = "xsrf_token=" + XSRFToken + "&do=" + (SG ? "comment_new" : "comment_insert") + "&trade_code=" + TradeCode + "&parent_id=" + ParentID + "&description=" +
             encodeURIComponent(Description);
         makeRequest(Data, URL, DEDStatus, function(Response) {
-            var FinalURL, ID, ResponseJSON;
+            var Match, ResponseJSON;
             if (SG) {
-                FinalURL = Response.finalUrl.match(/(.+?)(#.+?)?$/)[1];
-                ID = Response.finalUrl.match(/#(.+)/);
-                if (ID) {
+                Match = Response.finalUrl.match(/(.+?)(#(.+))?$/);
+                if (Match[3]) {
                     Callback();
+                    saveCHComment(DEDStatus.closest(".comment__children"), Match[1], parseHTML(Response.responseText).getElementsByTagName("title")[0].textContent, Match[3]);
                     if (DEDCallback) {
                         DEDCallback(Response, DEDStatus);
                     } else {
-                        window.location.href = "/go/comment/" + ID[1];
+                        window.location.href = "/go/comment/" + Match[3];
                     }
-                } else if (URL != FinalURL) {
-                    makeRequest(Data, FinalURL, DEDStatus, function(Response) {
+                } else if (URL != Match[1]) {
+                    makeRequest(Data, Match[1], DEDStatus, function(Response) {
                         Callback();
+                        Match = Response.finalUrl.match(/(.+?)(#(.+))?$/);
+                        saveCHComment(DEDStatus.closest(".comment__children"), Match[1], parseHTML(Response.responseText).getElementsByTagName("title")[0].textContent, Match[3]);
                         if (DEDCallback) {
                             DEDCallback(Response, DEDStatus);
                         } else {
-                            window.location.href = "/go/comment/" + Response.finalUrl.match(/#(.+)/)[1];
+                            window.location.href = "/go/comment/" + Match[3];
                         }
                     });
                 } else {
@@ -812,7 +830,7 @@
                 }
             } else {
                 ResponseJSON = parseJSON(Response.responseText);
-                if (JSON.success) {
+                if (ResponseJSON.success) {
                     Callback();
                     if (DEDCallback) {
                         DEDCallback(Response, DEDStatus);
@@ -1318,7 +1336,7 @@
     }
 
     function loadSMMenu(Sidebar, SMButton) {
-        var Selected, Item, SMSyncFrequency, I, Container, SMFeatures, ID, SMImport, SMExport, SMManageTags, SMLastSync, LastSync;
+        var Selected, Item, SMSyncFrequency, I, Container, SMFeatures, ID, SMImport, SMExport, SMCommentHistory, SMManageTags, SMLastSync, LastSync;
         Selected = Sidebar.getElementsByClassName("is-selected")[0];
         Selected.classList.remove("is-selected");
         SMButton.classList.add("is-selected");
@@ -1349,6 +1367,14 @@
                     "</div>" +
                     "<div class=\"form__submit-button SMExport\">" +
                     "    <i class=\"fa fa-arrow-circle-down\"></i> Export" +
+                    "</div>"
+                )
+            }, {
+                Title: "Comment History",
+                HTML: (
+                    "<div class=\"form__submit-button SMCommentHistory\">" +
+                    "    <i class=\"fa fa-comments\"></i> " +
+                    "    <span>Open</span>" +
                     "</div>"
                 )
             }, {
@@ -1397,6 +1423,7 @@
         }
         SMImport = Container.getElementsByClassName("SMImport")[0];
         SMExport = Container.getElementsByClassName("SMExport")[0];
+        SMCommentHistory = Container.getElementsByClassName("SMCommentHistory")[0];
         SMManageTags = Container.getElementsByClassName("SMManageTags")[0];
         SMSyncFrequency = Container.getElementsByClassName("SMSyncFrequency")[0];
         SMSyncFrequency.selectedIndex = GM_getValue("SyncFrequency");
@@ -1472,7 +1499,7 @@
         });
         SMManageTags.addEventListener("click", function() {
             var Popup, SMManageTagsPopup;
-            Popup = createPopup();
+            Popup = createPopup(true);
             Popup.Icon.classList.add("fa-cog");
             Popup.Title.textContent = "Manage tags:";
             Popup.TextInput.classList.remove("rhHidden");
@@ -1529,6 +1556,21 @@
                     SMManageTagsPopup.reposition();
                 });
             });
+        });
+        SMCommentHistory.addEventListener("click", function() {
+            var Popup;
+            Popup = createPopup(true);
+            Popup.Popup.style.width = "600px";
+            Popup.Icon.classList.add("fa-comments");
+            Popup.Title.textContent = "Comment History";
+            Popup.Results.classList.add("SMComments");
+            Popup.Results.innerHTML = GM_getValue("CommentHistory");
+            loadMatchesFeatures(Popup.Results, [{
+                Check: true,
+                Query: "[data-timestamp]",
+                Callback: setATTimestamp
+            }]);
+            Popup.popUp();
         });
     }
 
@@ -2026,6 +2068,25 @@
             STPBButton.addEventListener("mouseleave", function() {
                 setSiblingsOpacity(STPBButton, "1");
             });
+        }
+    }
+
+    // Comment History
+
+    function saveCHComment(Context, URL, Title, ID) {
+        var Username;
+        if (GM_getValue("CH")) {
+            if (Context) {
+                Username = Context.previousElementSibling.getElementsByClassName("comment__username")[0].textContent;
+            } else {
+                Username = null;
+            }
+            GM_setValue(
+                "CommentHistory",
+                "<div>You " + (Username ? ("replied to <a class=\"rhBold\"href=\"/user/" + Username + "\">" + Username + "</a> on") : "added a comment to") + " <a class=\"rhBold\" href=\"" +
+                URL + "\">" + Title + "</a> at <a class=\"rhBold\" data-timestamp=\"" + Math.floor((new Date().getTime()) / 1000) + "\" href=\"/go/comment/" + ID + "\"></a>.</div>" +
+                GM_getValue("CommentHistory")
+            );
         }
     }
 
@@ -3682,27 +3743,45 @@
     // Header Icons Refresher
 
     function setHIRRefresher() {
-        var CreatedIcon, WonIcon, MessagesIcon, Interval;
+        var CreatedIcon, WonIcon, MessagesIcon, HIR, Background, Icons, Interval;
         CreatedIcon = document.getElementsByClassName("nav__right-container")[0].firstElementChild;
         WonIcon = CreatedIcon.nextElementSibling;
         MessagesIcon = WonIcon.nextElementSibling;
+        HIR = {};
+        Background = GM_getValue("HIR_B");
+        Icons = [
+            "https://cdn.steamgifts.com/img/favicon.ico",
+            "https://www.dropbox.com/s/b329z9nbfi9rtqk/1.ico?raw=1",
+            "https://www.dropbox.com/s/h3dv3rbhgsswc3v/2.ico?raw=1",
+            "https://www.dropbox.com/s/mtr7d729l9h95nm/3.ico?raw=1",
+            "https://www.dropbox.com/s/khdk482xguewt1m/4.ico?raw=1",
+            "https://www.dropbox.com/s/kvguad7ikedyiwj/5.ico?raw=1",
+            "https://www.dropbox.com/s/y9i8gw8azdxb7v2/6.ico?raw=1",
+            "https://www.dropbox.com/s/5croyms6e407kvk/7.ico?raw=1",
+            "https://www.dropbox.com/s/33hkfd1z4leymhy/8.ico?raw=1",
+            "https://www.dropbox.com/s/v1ygqshzoqlids4/9.ico?raw=1",
+            "https://www.dropbox.com/s/8fm8m4lhwa1zy6r/0.ico?raw=1"
+        ];
         Interval = setInterval(function() {
-            refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon);
+            refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon, HIR, Background, Icons);
         }, 60000);
-        window.addEventListener("focus", function() {
-            refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon);
-            Interval = setInterval(function() {
-                refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon);
-            }, 60000);
-        });
-        window.addEventListener("blur", function() {
-            clearInterval(Interval);
-        });
+        if (!Background) {
+            window.addEventListener("focus", function() {
+                refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon, HIR, Background, Icons);
+                Interval = setInterval(function() {
+                    refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon, HIR, Background, Icons);
+                }, 60000);
+            });
+            window.addEventListener("blur", function() {
+                clearInterval(Interval);
+            });
+        }
     }
 
-    function refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon) {
-        makeRequest(null, "/", null, function(Response) {
-            var Created, Won, Messages;
+    function refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon, HIR, Background, Icons) {
+        var Callback;
+        Callback = function(Response) {
+            var Created, Won, Messages, Count;
             Created = parseHTML(Response.responseText).getElementsByClassName("nav__right-container")[0].firstElementChild;
             Won = Created.nextElementSibling;
             Messages = Won.nextElementSibling;
@@ -3712,7 +3791,26 @@
             WonIcon.innerHTML = Won.innerHTML;
             MessagesIcon.className = Messages.className;
             MessagesIcon.innerHTML = Messages.innerHTML;
-        });
+            Count = MessagesIcon.getElementsByClassName("nav__notification")[0];
+            Count = Count ? parseInt(Count.textContent) : 0;
+            if (HIR.LastCount != Count) {
+                HIR.LastCount = Count;
+                if (Background) {
+                    if (document.hasFocus()) {
+                        document.querySelector("link[rel='shortcut icon']").href = Icons[0];
+                    } else {
+                        document.querySelector("link[rel='shortcut icon']").href = Icons[(Count > 9) ? 10 : Count];
+                    }
+                }
+            } else if (document.hasFocus()) {
+                document.querySelector("link[rel='shortcut icon']").href = Icons[0];
+            }
+        };
+        if (Background) {
+            queueRequest({}, null, "/", Callback);
+        } else {
+            makeRequest(null, "/", null, Callback);
+        }
     }
 
     // Advanced Giveaway Search
@@ -3793,44 +3891,67 @@
     // Points Refresher
 
     function setPRRefresher() {
-        var XSRFToken, Points, Interval;
+        var XSRFToken, Points, PR, Title, Background, Interval;
         XSRFToken = document.querySelector("[name='xsrf_token']");
         if (XSRFToken) {
             XSRFToken = XSRFToken.value;
             Points = document.getElementsByClassName("nav__points")[0];
+            PR = {};
+            Title = document.getElementsByTagName("title")[0].textContent;
+            Background = GM_getValue("PR_B");
             Interval = setInterval(function() {
-                refreshPRPoints(XSRFToken, Points);
+                refreshPRPoints(XSRFToken, Points, PR, Title, Background);
             }, 60000);
-            window.addEventListener("focus", function() {
-                refreshPRPoints(XSRFToken, Points);
-                Interval = setInterval(function() {
-                    refreshPRPoints(XSRFToken, Points);
-                }, 60000);
-            });
-            window.addEventListener("blur", function() {
-                clearInterval(Interval);
-            });
+            if (!Background) {
+                window.addEventListener("focus", function() {
+                    refreshPRPoints(XSRFToken, Points, PR, Title, Background);
+                    Interval = setInterval(function() {
+                        refreshPRPoints(XSRFToken, Points, PR, Title, Background);
+                    }, 60000);
+                });
+                window.addEventListener("blur", function() {
+                    clearInterval(Interval);
+                });
+            }
         }
     }
 
-    function refreshPRPoints(XSRFToken, Points) {
-        makeRequest("xsrf_token=" + XSRFToken + "&do=entry_insert", "/ajax.php", null, function(Response) {
+    function refreshPRPoints(XSRFToken, Points, PR, Title, Background) {
+        var Callback;
+        Callback = function(Response) {
             var NumPoints, Matches, I, N, Context;
             NumPoints = parseJSON(Response.responseText).points;
             Points.textContent = NumPoints;
-            Matches = document.getElementsByClassName("EGBButton");
-            for (I = 0, N = Matches.length; I < N; ++I) {
-                if (!Matches[I].getAttribute("data-entered")) {
-                    if (parseInt(Matches[I].getAttribute("data-points")) <= NumPoints) {
-                        Matches[I].classList.remove("rhHidden");
-                        Matches[I].nextElementSibling.classList.add("rhHidden");
-                    } else {
-                        Matches[I].classList.add("rhHidden");
-                        Matches[I].nextElementSibling.classList.remove("rhHidden");
+            if (PR.LastPoints != NumPoints) {
+                PR.LastPoints = NumPoints;
+                Matches = document.getElementsByClassName("EGBButton");
+                for (I = 0, N = Matches.length; I < N; ++I) {
+                    if (!Matches[I].getAttribute("data-entered")) {
+                        if (parseInt(Matches[I].getAttribute("data-points")) <= NumPoints) {
+                            Matches[I].classList.remove("rhHidden");
+                            Matches[I].nextElementSibling.classList.add("rhHidden");
+                        } else {
+                            Matches[I].classList.add("rhHidden");
+                            Matches[I].nextElementSibling.classList.remove("rhHidden");
+                        }
                     }
                 }
+                if (Background) {
+                    if (document.hasFocus()) {
+                        document.getElementsByTagName("title")[0].textContent = Title;
+                    } else {
+                        document.getElementsByTagName("title")[0].textContent = "(" + NumPoints + "P) " + Title;
+                    }
+                }
+            } else if (document.hasFocus()) {
+                document.getElementsByTagName("title")[0].textContent = Title;
             }
-        });
+        };
+        if (Background) {
+            queueRequest({}, "xsrf_token=" + XSRFToken + "&do=entry_insert", "/ajax.php", Callback);
+        } else {
+            makeRequest("xsrf_token=" + XSRFToken + "&do=entry_insert", "/ajax.php", null, Callback);
+        }
     }
 
     // Entered Games Highlighter
@@ -4108,7 +4229,7 @@
     // Comment Tracker
 
     function checkCTVisited(Matches) {
-        var ID, Comments, I, N, Link, Match, Type, Key, Element, CommentsCount, Count, Read, CTPanel;
+        var ID, Comments, I, N, Link, Match, Type, Key, Element, CommentsCount, Count, Read, LastUnread, CTPanel;
         ID = "Comments" + (SG ? "" : "_ST");
         Comments = GM_getValue(ID);
         for (I = 0, N = Matches.length; I < N; ++I) {
@@ -4137,10 +4258,11 @@
                         }
                         if (Read < Count) {
                             CommentsCount.insertAdjacentText("beforeEnd", " (+" + (Count - Read) + ")");
+                            LastUnread = GM_getValue("CT_LU");
                             CommentsCount.insertAdjacentHTML(
                                 "afterEnd",
                                 " <span class=\"CTPanel\">" +
-                                "    <a class=\"CTGoToUnread\" title=\"Go to the first unread comment.\">" +
+                                "    <a class=\"CTGoToUnread\" title=\"Go to the " + (LastUnread ? "last" : "first") + " unread comment.\">" +
                                 "        <i class=\"fa fa-comments-o\"></i>" +
                                 "    </a>" +
                                 "    <a class=\"CTMarkRead\" title=\"Mark all comments as read.\">" +
@@ -4149,7 +4271,7 @@
                                 "</span>"
                             );
                             CTPanel = CommentsCount.nextElementSibling;
-                            setCTPanel(CTPanel, CommentsCount.href, Key, Element);
+                            setCTPanel(CTPanel, CommentsCount.href, Key, LastUnread, Element);
                             if (!Comments[Key].Visited) {
                                 CTPanel.insertAdjacentHTML(
                                     "beforeEnd",
@@ -4166,7 +4288,7 @@
         }
     }
 
-    function setCTPanel(CTPanel, URL, Key, Element) {
+    function setCTPanel(CTPanel, URL, Key, LastUnread, Element) {
         var CTGoToUnread, CTMarkRead;
         CTGoToUnread = CTPanel.firstElementChild;
         CTMarkRead = CTGoToUnread.nextElementSibling;
@@ -4174,7 +4296,7 @@
             CTPanel.innerHTML = "<i class=\"fa fa-circle-o-notch fa-spin\"></i>";
             markCTDiscussionRead({
                 Progress: CTPanel
-            }, URL + "/search?page=", 1, Key, true, function(ID) {
+            }, URL + "/search?page=", 1, Key, true, LastUnread, LastUnread, function(ID) {
                 window.location.href = ID ? "/go/comment/" + ID : URL;
             });
         });
@@ -4184,13 +4306,13 @@
             CTPanel.innerHTML = "<i class=\"fa fa-circle-o-notch fa-spin\"></i>";
             markCTDiscussionRead({
                 Progress: CTPanel
-            }, URL + "/search?page=", 1, Key, false, function() {
+            }, URL + "/search?page=", 1, Key, false, false, false, function() {
                 CTPanel.remove();
             });
         });
     }
 
-    function markCTDiscussionRead(CT, URL, NextPage, Key, Unread, Callback) {
+    function markCTDiscussionRead(CT, URL, NextPage, Key, Unread, LastUnread, LastUnreadFirst, Callback) {
         queueRequest(CT, null, URL + NextPage, function(Response) {
             var ResponseHTML, Matches, I, N, Comments, ID, Timestamp, Found, Pagination;
             ResponseHTML = parseHTML(Response.responseText);
@@ -4223,8 +4345,17 @@
                 }
             }
             Pagination = ResponseHTML.getElementsByClassName("pagination__navigation")[0];
-            if (Matches.length && !Found && Pagination && !Pagination.lastElementChild.classList.contains("is-selected")) {
-                setTimeout(markCTDiscussionRead, 0, CT, URL, ++NextPage, Key, Unread, Callback);
+            if (Matches.length && !Found && ((LastUnread && (NextPage >= 1)) || (!LastUnread && Pagination && !Pagination.lastElementChild.classList.contains("is-selected")))) {
+                if (LastUnreadFirst) {
+                    if (Pagination) {
+                        NextPage = parseInt(Pagination.lastElementChild.getAttribute("data-page-number")) + 1;
+                    } else {
+                        Callback(ID);
+                    }
+                } else if (LastUnread && (NextPage == 1)) {
+                    Callback(ID);
+                }
+                setTimeout(markCTDiscussionRead, 0, CT, URL, LastUnread ? --NextPage : ++NextPage, Key, Unread, LastUnread, false, Callback);
             } else {
                 Callback(ID);
             }
@@ -4342,7 +4473,7 @@
 
     function setATTimestamp(Context) {
         if (!Context.textContent.match(/\*/)) {
-            Context.textContent = (new Date(parseInt(Context.getAttribute("data-timestamp")) * 1000).toLocaleString()) + " - " + Context.textContent;
+            Context.textContent = (new Date(parseInt(Context.getAttribute("data-timestamp")) * 1000).toLocaleString()) + (Context.textContent ? (" - " + Context.textContent) : "");
         }
     }
 
@@ -12598,6 +12729,9 @@
             "}" +
             ".SMTag {" +
             "    display: block;" +
+            "}" +
+            ".SMComments a {" +
+            "    border-bottom: 1px dotted;" +
             "}" +
             ".SMSyncFrequency {" +
             "    display: block;" +
