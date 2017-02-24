@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.7.3
+// @version 4.7.4
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -1318,7 +1318,7 @@
     }
 
     function loadSMMenu(Sidebar, SMButton) {
-        var Selected, Item, SMSyncFrequency, I, Container, SMFeatures, ID, SMLastSync, LastSync, SMImport, SMExport;
+        var Selected, Item, SMSyncFrequency, I, Container, SMFeatures, ID, SMImport, SMExport, SMManageTags, SMLastSync, LastSync;
         Selected = Sidebar.getElementsByClassName("is-selected")[0];
         Selected.classList.remove("is-selected");
         SMButton.classList.add("is-selected");
@@ -1349,6 +1349,14 @@
                     "</div>" +
                     "<div class=\"form__submit-button SMExport\">" +
                     "    <i class=\"fa fa-arrow-circle-down\"></i> Export" +
+                    "</div>"
+                )
+            }, {
+                Title: "Manage Tags",
+                HTML: (
+                    "<div class=\"form__submit-button SMManageTags\">" +
+                    "    <i class=\"fa fa-cog\"></i> " +
+                    "    <span>Manage</span>" +
                     "</div>"
                 )
             }, {
@@ -1387,6 +1395,9 @@
         for (ID in Features) {
             SMFeatures.appendChild(getSMFeature(Features[ID], ID));
         }
+        SMImport = Container.getElementsByClassName("SMImport")[0];
+        SMExport = Container.getElementsByClassName("SMExport")[0];
+        SMManageTags = Container.getElementsByClassName("SMManageTags")[0];
         SMSyncFrequency = Container.getElementsByClassName("SMSyncFrequency")[0];
         SMSyncFrequency.selectedIndex = GM_getValue("SyncFrequency");
         SMLastSync = Container.getElementsByClassName("SMLastSync")[0];
@@ -1404,8 +1415,9 @@
         });
         addWBCButton();
         addNAMWCButton();
-        SMImport = Container.getElementsByClassName("SMImport")[0];
-        SMExport = Container.getElementsByClassName("SMExport")[0];
+        SMSyncFrequency.addEventListener("change", function() {
+            GM_setValue("SyncFrequency", SMSyncFrequency.selectedIndex);
+        });
         SMImport.addEventListener("click", function() {
             var File, Reader;
             File = document.createElement("input");
@@ -1458,8 +1470,65 @@
             window.URL.revokeObjectURL(URL);
             window.alert("Exported!");
         });
-        SMSyncFrequency.addEventListener("change", function() {
-            GM_setValue("SyncFrequency", SMSyncFrequency.selectedIndex);
+        SMManageTags.addEventListener("click", function() {
+            var Popup, SMManageTagsPopup;
+            Popup = createPopup();
+            Popup.Icon.classList.add("fa-cog");
+            Popup.Title.textContent = "Manage tags:";
+            Popup.TextInput.classList.remove("rhHidden");
+            Popup.TextInput.insertAdjacentHTML(
+                "afterEnd",
+                createDescription("Filter users by tag (use commas to separate filters, for example: Filter1, Filter2, ...). Filters are not case sensitive.")
+            );
+            SMManageTagsPopup = Popup.popUp(function() {
+                var SavedUsers, Tags, I, N, SavedTags, J, NumTags, Key;
+                SavedUsers = GM_getValue("Users");
+                Tags = {};
+                for (I = 0, N = SavedUsers.length; I < N; ++I) {
+                    if (SavedUsers[I].Tags) {
+                        Popup.Results.insertAdjacentHTML(
+                            "beforeEnd",
+                            "<div>" +
+                            "    <a href=\"/user/" + SavedUsers[I].Username + "\">" + SavedUsers[I].Username + "</a>" +
+                            "</div>"
+                        );
+                        SMManageTagsPopup.reposition();
+                        SavedTags = SavedUsers[I].Tags.split(/,\s/g);
+                        for (J = 0, NumTags = SavedTags.length; J < NumTags; ++J) {
+                            Key = SavedTags[J].toLowerCase();
+                            if (!Tags[Key]) {
+                                Tags[Key] = [];
+                            }
+                            Tags[Key].push(Popup.Results.children.length - 1);
+                        }
+                    }
+                }
+                loadEndlessFeatures(Popup.Results);
+                Popup.TextInput.addEventListener("input", function() {
+                    var Matches, Filters;
+                    Matches = Popup.Results.getElementsByClassName("SMTag");
+                    for (I = 0, N = Matches.length; I < N; ++I) {
+                        if (Matches[I]) {
+                            Matches[I].classList.remove("SMTag");
+                        }
+                    }
+                    if (Popup.TextInput.value) {
+                        Popup.Results.classList.add("SMTags");
+                        Filters = Popup.TextInput.value.split(/,\s*/g);
+                        for (I = 0, N = Filters.length; I < N; ++I) {
+                            Key = Filters[I].toLowerCase();
+                            if (Tags[Key]) {
+                                for (J = 0, NumTags = Tags[Key].length; J < NumTags; ++J) {
+                                    Popup.Results.children[Tags[Key][J]].classList.add("SMTag");
+                                }
+                            }
+                        }
+                    } else {
+                        Popup.Results.classList.remove("SMTags");
+                    }
+                    SMManageTagsPopup.reposition();
+                });
+            });
         });
     }
 
@@ -4039,7 +4108,7 @@
     // Comment Tracker
 
     function checkCTVisited(Matches) {
-        var ID, Comments, I, N, Link, Match, Type, Key, Element, CommentsCount, Count, Read;
+        var ID, Comments, I, N, Link, Match, Type, Key, Element, CommentsCount, Count, Read, CTPanel;
         ID = "Comments" + (SG ? "" : "_ST");
         Comments = GM_getValue(ID);
         for (I = 0, N = Matches.length; I < N; ++I) {
@@ -4079,7 +4148,17 @@
                                 "    </a>" +
                                 "</span>"
                             );
-                            setCTPanel(CommentsCount.nextElementSibling, CommentsCount.href, Key, Element);
+                            CTPanel = CommentsCount.nextElementSibling;
+                            setCTPanel(CTPanel, CommentsCount.href, Key, Element);
+                            if (!Comments[Key].Visited) {
+                                CTPanel.insertAdjacentHTML(
+                                    "beforeEnd",
+                                    "<a class=\"CTMarkVisited\" title=\"Mark discussion as visited.\">" +
+                                    "    <i class=\"fa fa-check\"></i>" +
+                                    "</a>"
+                                );
+                                setCTVisited(CTPanel, Key, Element);
+                            }
                         }
                     }
                 }
@@ -4149,6 +4228,20 @@
             } else {
                 Callback(ID);
             }
+        });
+    }
+
+    function setCTVisited(CTPanel, Key, Element) {
+        var CTMarkVisited;
+        CTMarkVisited = CTPanel.lastElementChild;
+        CTMarkVisited.addEventListener("click", function() {
+            var Comments;
+            Comments = GM_getValue("Comments");
+            Comments[Key].Visited = true;
+            GM_setValue("Comments", Comments);
+            Element.style.opacity = "0.5";
+            setHoverOpacity(Element, "1", "0.5");
+            CTMarkVisited.remove();
         });
     }
 
@@ -12500,6 +12593,12 @@
             ".SMMenu .form__submit-button {" +
             "    margin: 0 5px;" +
             "}" +
+            ".SMTags >* {" +
+            "    display: none;" +
+            "}" +
+            ".SMTag {" +
+            "    display: block;" +
+            "}" +
             ".SMSyncFrequency {" +
             "    display: block;" +
             "    width: 200px;" +
@@ -12560,7 +12659,7 @@
             "    width: 14px;" +
             "}" +
             ".ESPanel .pagination__navigation >*, .ESPanel .pagination_navigation >*, .ESRefresh, .ESPause, .UHButton, .PUNButton, .WBCButton, .NAMWCButton, .NRFButton, .UGSButton," +
-            ".EGBDescription, .CTGoToUnread, .CTMarkRead, .MCBPButton, .MPPButton, .ASButton {" +
+            ".EGBDescription, .CTGoToUnread, .CTMarkRead, .CTMarkVisited, .MCBPButton, .MPPButton, .ASButton {" +
             "    cursor: pointer;" +
             "    display: inline-block;" +
             "}" +
