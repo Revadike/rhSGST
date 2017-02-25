@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.9
+// @version 4.9.1
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -394,7 +394,7 @@
                 addSTPBButton(Context, SteamID64);
             }
             if (GM_getValue("UH")) {
-                addUHContainer(Heading, Username, SteamID64);
+                addUHContainer(Heading, SteamID64, Username);
             }
             if (GM_getValue("RWSCVL")) {
                 addRWSCVLLinks(Context, Username);
@@ -552,6 +552,10 @@
             Check: GM_getValue("EGB") && Path.match(/^\/($|giveaways)/),
             Query: ".giveaway__row-inner-wrap",
             Callback: addEGBPanel
+        }, {
+            Check: true,
+            Query: ".giveaway__row-inner-wrap.is-faded",
+            Callback: setFadedGiveaway
         }, {
             Check: GM_getValue("DH") && Path.match(/^\/discussions/),
             Query: ".table__row-outer-wrap",
@@ -1050,6 +1054,11 @@
         });
     }
 
+    function setFadedGiveaway(Context) {
+        Context.classList.remove("is-faded");
+        Context.classList.add("rhFaded");
+    }
+
     function createPopup(Temp) {
         var Popup;
         document.body.insertAdjacentHTML(
@@ -1344,7 +1353,7 @@
     }
 
     function loadSMMenu(Sidebar, SMButton) {
-        var Selected, Item, SMSyncFrequency, I, Container, SMFeatures, ID, SMImport, SMExport, SMCommentHistory, SMManageTags, SMLastSync, LastSync;
+        var Selected, Item, SMSyncFrequency, I, Container, SMFeatures, ID, SMImport, SMExport, SMRecentUsernameChanges, SMCommentHistory, SMManageTags, SMLastSync, LastSync;
         Selected = Sidebar.getElementsByClassName("is-selected")[0];
         Selected.classList.remove("is-selected");
         SMButton.classList.add("is-selected");
@@ -1375,6 +1384,14 @@
                     "</div>" +
                     "<div class=\"form__submit-button SMExport\">" +
                     "    <i class=\"fa fa-arrow-circle-down\"></i> Export" +
+                    "</div>"
+                )
+            }, {
+                Title: "Recent Username Changes",
+                HTML: (
+                    "<div class=\"form__submit-button SMRecentUsernameChanges\">" +
+                    "    <i class=\"fa fa-user\"></i> " +
+                    "    <span>Open</span>" +
                     "</div>"
                 )
             }, {
@@ -1431,6 +1448,7 @@
         }
         SMImport = Container.getElementsByClassName("SMImport")[0];
         SMExport = Container.getElementsByClassName("SMExport")[0];
+        SMRecentUsernameChanges = Container.getElementsByClassName("SMRecentUsernameChanges")[0];
         SMCommentHistory = Container.getElementsByClassName("SMCommentHistory")[0];
         SMManageTags = Container.getElementsByClassName("SMManageTags")[0];
         SMSyncFrequency = Container.getElementsByClassName("SMSyncFrequency")[0];
@@ -1564,6 +1582,29 @@
                     SMManageTagsPopup.reposition();
                 });
             });
+        });
+        SMRecentUsernameChanges.addEventListener("click", function() {
+            var Popup, SMRecentUsernameChangesPopup;
+            Popup = createPopup(true);
+            Popup.Results.classList.add("SMRecentUsernameChanges");
+            Popup.Icon.classList.add("fa-comments");
+            Popup.Title.textContent = "Recent Username Changes";
+            Popup.Progress.innerHTML =
+                "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
+                "<span>Loading recent username changes...</span>";
+            makeRequest(null, "https://script.google.com/macros/s/AKfycbzvOuHG913mRIXOsqHIeAuQUkLYyxTHOZim5n8iP-k80iza6g0/exec?Action=2", Popup.Progress, function(Response) {
+                var RecentChanges, HTML, N;
+                Popup.Progress.innerHTML = "";
+                RecentChanges = parseJSON(Response.responseText).RecentChanges;
+                HTML = "";
+                for (I = 0, N = RecentChanges.length; I < N; ++I) {
+                    HTML += "<div>" + RecentChanges[I][0] + " changed to <a class=\"rhBold\" href=\"/user/" + RecentChanges[I][1] + "\">" + RecentChanges[I][1] + "</a></div>";
+                }
+                Popup.Results.innerHTML = HTML;
+                loadEndlessFeatures(Popup.Results);
+                SMRecentUsernameChangesPopup.reposition();
+            });
+            SMRecentUsernameChangesPopup = Popup.popUp();
         });
         SMCommentHistory.addEventListener("click", function() {
             var Popup;
@@ -2033,10 +2074,10 @@
         }
     }
 
-    // SteamGifts Profile Button
+    // SGPB - SteamGifts Profile Button
 
     function addSGPBButton(SteamID64, SteamButton) {
-        var Context, SGPBButton;
+        var Context;
         Context = document.getElementsByClassName("profile_links")[0];
         Context.insertAdjacentHTML(
             "beforeEnd",
@@ -2049,16 +2090,15 @@
             "    </a>" +
             "</div>"
         );
-        SGPBButton = Context.lastElementChild.firstElementChild;
-        SGPBButton.parentElement.insertBefore(SteamButton, SGPBButton);
+        Context = Context.lastElementChild;
+        Context.insertBefore(SteamButton, Context.firstElementChild);
     }
 
-    // SteamTrades Profile Button
+    // STPB - SteamTrades Profile Button
 
     function addSTPBButton(Context, SteamID64) {
-        var Tooltip, STPBButton;
+        var STPBButton;
         Context = Context.getElementsByClassName("sidebar__shortcut-inner-wrap")[0];
-        Tooltip = Context.parentElement.getElementsByClassName("js-tooltip")[0];
         Context.insertAdjacentHTML(
             "beforeEnd",
             "<a class=\"STPBButton\" href=\"https://www.steamtrades.com/user/" + SteamID64 + "\" rel=\"nofollow\" target=\"_blank\">" +
@@ -2068,9 +2108,10 @@
             "</a>"
         );
         STPBButton = Context.lastElementChild;
-        if (Tooltip) {
+        Context = Context.parentElement.getElementsByClassName("js-tooltip")[0];
+        if (Context) {
             STPBButton.addEventListener("mouseenter", function() {
-                Tooltip.textContent = "Visit SteamTrades Profile";
+                Context.textContent = "Visit SteamTrades Profile";
                 setSiblingsOpacity(STPBButton, "0.2");
             });
             STPBButton.addEventListener("mouseleave", function() {
@@ -2098,9 +2139,9 @@
         }
     }
 
-    // Username History
+    // UH - Username History
 
-    function addUHContainer(Context, Username, SteamID64) {
+    function addUHContainer(Context, SteamID64, Username) {
         var UHContainer, UHButton, UHBox, UHList;
         Context = Context.getElementsByClassName("featured__heading__medium")[0];
         Context.insertAdjacentHTML(
@@ -2126,9 +2167,9 @@
                 UHList.innerHTML =
                     "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
                     "<span>Loading usernames...</span>";
-                makeRequest(null, "https://script.google.com/macros/s/AKfycbwYyn2dwycQeajv2bQ921oNqtfm2iaXtmi7dsXubz5vZTGfDoHa/exec?Username=" + Username + "&SteamID=" + SteamID64, UHList,
-                            function(Response) {
-                    UHList.innerHTML = "<li>" + parseJSON(Response.responseText).Usernames.replace(/\s/g, "</li><li>") + "</li>";
+                makeRequest(null, "https://script.google.com/macros/s/AKfycbzvOuHG913mRIXOsqHIeAuQUkLYyxTHOZim5n8iP-k80iza6g0/exec?Action=1&SteamID64=" + SteamID64 + "&Username=" + Username,
+                            UHList, function(Response) {
+                    UHList.innerHTML = "<li>" + parseJSON(Response.responseText).Usernames.join("</li><li>") + "</li>";
                 });
             }
         });
@@ -2800,13 +2841,16 @@
     }
 
     function getWBCUsers(WBC, NextPage, CurrentPage, URL, Callback, Context) {
-        var Matches, I, N, Username, Pagination;
+        var Matches, I, N, Match, Username, Pagination;
         if (Context) {
             Matches = Context.querySelectorAll("a[href*='/user/']");
             for (I = 0, N = Matches.length; I < N; ++I) {
-                Username = Matches[I].getAttribute("href").match(/\/user\/(.+)/)[1];
-                if ((WBC.Users.indexOf(Username) < 0) && (Username != WBC.Username) && (Username == Matches[I].textContent) && !Matches[I].closest(".markdown")) {
-                    WBC.Users.push(Username);
+                Match = Matches[I].getAttribute("href").match(/\/user\/(.+)/);
+                if (Match) {
+                    Username = Match[1];
+                    if ((WBC.Users.indexOf(Username) < 0) && (Username != WBC.Username) && (Username == Matches[I].textContent) && !Matches[I].closest(".markdown")) {
+                        WBC.Users.push(Username);
+                    }
                 }
             }
             Pagination = Context.getElementsByClassName("pagination__navigation")[0];
@@ -3722,8 +3766,8 @@
                     UGS.UnsentUsers.insertAdjacentHTML(
                         "beforeEnd",
                         "<span><a href=\"/user/" + Keys[I] + "\">" + Keys[I] + "</a> (" + (!Reroll ? ("Being rerolled for <a href=\"" + UGS.Giveaways[J].URL + "\">" + UGS.Giveaways[J].Name +
-                                                                                                     "</a>.)") : ("Already won <a href=\"" + UGS.Giveaways[J].URL + "\">" +
-                                                                                                                  UGS.Giveaways[J].Name + "</a> from you.)")) + "</span>"
+                                                                                                      "</a>.)") : ("Already won <a href=\"" + UGS.Giveaways[J].URL + "\">" +
+                                                                                                                   UGS.Giveaways[J].Name + "</a> from you.)")) + "</span>"
                     );
                     sendUGSGifts(UGS, ++I, N, J, Keys, Winners, Callback);
                 }
@@ -4058,15 +4102,15 @@
             "    </div>" +
             "</div>"
         );
-        if (EntryPoints <= parseInt(Points.textContent)) {
-            EGBButton.nextElementSibling.classList.add("rhHidden");
-        } else {
-            EGBButton.classList.add("rhHidden");
-        }
         if (Context.classList.contains("is-faded")) {
             Context.classList.remove("is-faded");
             Context.classList.add("rhFaded");
             EGBButton.setAttribute("data-entered", true);
+            if (EntryPoints <= parseInt(Points.textContent)) {
+                EGBButton.nextElementSibling.classList.add("rhHidden");
+            } else {
+                EGBButton.classList.add("rhHidden");
+            }
             setEGBButton("fa-minus-circle", "Leave", "Leaving...", "entry_delete");
         } else {
             setEGBButton("fa-plus-circle", "Enter", "Entering...", "entry_insert");
@@ -12751,7 +12795,7 @@
             ".SMTag {" +
             "    display: block;" +
             "}" +
-            ".SMComments a {" +
+            ".SMRecentUsernameChanges a, .SMComments a {" +
             "    border-bottom: 1px dotted;" +
             "}" +
             ".SMSyncFrequency {" +
