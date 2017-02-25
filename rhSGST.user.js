@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.9.3
+// @version 4.9.4
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -12702,7 +12702,7 @@
             ".rhBusy >*, .CFHALIPF {" +
             "    opacity: 0.2;" +
             "}" +
-            ".rhFaded .giveaway__summary >:not(.EGBPanel), .rhFaded .EGBPanel >:not(.GGPContainer), .rhFaded .global__image-outer-wrap--game-medium {" +
+            ".rhFaded .giveaway__summary >:not(.EGBPanel):not(.giveaway__columns), .rhFaded .giveaway__columns >:not(.GGPContainer), .rhFaded .global__image-outer-wrap--game-medium {" +
             "    opacity: 0.5;" +
             "}" +
             ".rhPopup {" +
