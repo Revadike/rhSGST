@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.8
+// @version 4.9
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -151,6 +151,9 @@
             EGB_C: {
                 Name: "Pop up the box to add a comment to the giveaway even if it doesn't have any description."
             }
+        },
+        GH: {
+            Name: "Groups Highlighter"
         },
         GGP: {
             Name: "Giveaway Groups Popout"
@@ -533,9 +536,14 @@
             Query: ".global__image-outer-wrap--avatar-small",
             Callback: addAPBox
         }, {
-            Check: GM_getValue("EGF"),
+            Check: GM_getValue("EGF") && Path.match(/^\/($|giveaways)/),
             Query: ".giveaway__row-inner-wrap.is-faded",
             Callback: hideEGFGiveaway
+        }, {
+            Check: GM_getValue("GH") && !Path.match(/^\/account/),
+            Query: ".table__column__heading[href*='/group/']",
+            Callback: highlightGHGroups,
+            All: true
         }, {
             Check: GM_getValue("GGP"),
             Query: ".giveaway__column--group",
@@ -4134,6 +4142,19 @@
                     });
                 }
             });
+        }
+    }
+
+    // Groups Highlighter
+
+    function highlightGHGroups(Matches) {
+        var I, N, SavedGroups, Group;
+        SavedGroups = GM_getValue("Groups");
+        for (I = 0, N = Matches.length; I < N; ++I) {
+            Group = Matches[I].getAttribute("href").match(/\/group\/(.+)\//)[1];
+            if (SavedGroups.indexOf(Group) >= 0) {
+                Matches[I].closest(".table__row-outer-wrap").classList.add("GHHighlight");
+            }
         }
     }
 
@@ -12926,7 +12947,7 @@
             "    max-width: 75%;" +
             "    min-width: 600px;" +
             "}" +
-            ".DHHighlight {" +
+            ".DHHighlight, .GHHighlight {" +
             "    background-color: " + Positive.replace(/rgb/, "rgba").replace(/\)/, ", 0.2)") + ";" +
             "}" +
             ".DHIcon {" +
