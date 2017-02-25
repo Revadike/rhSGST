@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.9.2
+// @version 4.9.3
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -1703,6 +1703,7 @@
         if (!Heading) {
             Heading = Headings[0];
         }
+        Heading.classList.add("FEHeading");
         Height = document.getElementsByTagName("header")[0].offsetHeight + 25;
         Width = Heading.offsetWidth + "px";
         document.addEventListener("scroll", fixHeading);
@@ -1712,7 +1713,7 @@
             Top = Heading.offsetTop - Height;
             if (window.scrollY > Top) {
                 document.removeEventListener("scroll", fixHeading);
-                Heading.classList.add("FEHeading");
+                Heading.classList.add("FEHeadingFixed");
                 Heading.style.top = Height + "px";
                 Heading.style.width = Width;
                 Heading.insertAdjacentHTML("afterBegin", "<div class=\"" + (SG ? "page__outer-wrap" : "page_outer_wrap") + " FEHeadingBackground\"></div>");
@@ -1726,7 +1727,7 @@
         function unfixHeading() {
             if (window.scrollY <= Top) {
                 document.removeEventListener("scroll", unfixHeading);
-                Heading.classList.remove("FEHeading");
+                Heading.classList.remove("FEHeadingFixed");
                 Heading.removeAttribute("style");
                 Background.remove();
                 document.addEventListener("scroll", fixHeading);
@@ -12810,7 +12811,7 @@
             "    width: 100%;" +
             "    z-index: 999 !important;" +
             "}" +
-            ".FEHeading {" +
+            ".FEHeadingFixed {" +
             "    position: fixed;" +
             "    z-index: 998;" +
             "}" +
