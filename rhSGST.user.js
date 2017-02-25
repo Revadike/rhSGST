@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.9.1
+// @version 4.9.2
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -4106,13 +4106,14 @@
             Context.classList.remove("is-faded");
             Context.classList.add("rhFaded");
             EGBButton.setAttribute("data-entered", true);
+            EGBButton.nextElementSibling.classList.add("rhHidden");
+            setEGBButton("fa-minus-circle", "Leave", "Leaving...", "entry_delete");
+        } else {
             if (EntryPoints <= parseInt(Points.textContent)) {
                 EGBButton.nextElementSibling.classList.add("rhHidden");
             } else {
                 EGBButton.classList.add("rhHidden");
             }
-            setEGBButton("fa-minus-circle", "Leave", "Leaving...", "entry_delete");
-        } else {
             setEGBButton("fa-plus-circle", "Enter", "Entering...", "entry_insert");
         }
         EGBDescription.addEventListener("click", function() {
