@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.9.4
+// @version 4.9.5
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -813,7 +813,9 @@
                 Match = Response.finalUrl.match(/(.+?)(#(.+))?$/);
                 if (Match[3]) {
                     Callback();
-                    saveCHComment(DEDStatus.closest(".comment__children"), Match[1], parseHTML(Response.responseText).getElementsByTagName("title")[0].textContent, Match[3]);
+                    if (GM_getValue("CH")) {
+                        saveCHComment(DEDStatus.closest(".comment__children"), Match[1], parseHTML(Response.responseText).getElementsByTagName("title")[0].textContent, Match[3]);
+                    }
                     if (DEDCallback) {
                         DEDCallback(Response, DEDStatus);
                     } else {
@@ -823,7 +825,9 @@
                     makeRequest(Data, Match[1], DEDStatus, function(Response) {
                         Callback();
                         Match = Response.finalUrl.match(/(.+?)(#(.+))?$/);
-                        saveCHComment(DEDStatus.closest(".comment__children"), Match[1], parseHTML(Response.responseText).getElementsByTagName("title")[0].textContent, Match[3]);
+                        if (GM_getValue("CH")) {
+                            saveCHComment(DEDStatus.closest(".comment__children"), Match[1], parseHTML(Response.responseText).getElementsByTagName("title")[0].textContent, Match[3]);
+                        }
                         if (DEDCallback) {
                             DEDCallback(Response, DEDStatus);
                         } else {
@@ -2121,25 +2125,6 @@
         }
     }
 
-    // Comment History
-
-    function saveCHComment(Context, URL, Title, ID) {
-        var Username;
-        if (GM_getValue("CH")) {
-            if (Context) {
-                Username = Context.previousElementSibling.getElementsByClassName("comment__username")[0].textContent;
-            } else {
-                Username = null;
-            }
-            GM_setValue(
-                "CommentHistory",
-                "<div>You " + (Username ? ("replied to <a class=\"rhBold\"href=\"/user/" + Username + "\">" + Username + "</a> on") : "added a comment to") + " <a class=\"rhBold\" href=\"" +
-                URL + "\">" + Title + "</a> at <a class=\"rhBold\" data-timestamp=\"" + Math.floor((new Date().getTime()) / 1000) + "\" href=\"/go/comment/" + ID + "\"></a>.</div>" +
-                GM_getValue("CommentHistory")
-            );
-        }
-    }
-
     // UH - Username History
 
     function addUHContainer(Context, SteamID64, Username) {
@@ -2179,6 +2164,22 @@
                 UHBox.classList.add("rhHidden");
             }
         });
+    }
+
+    // CH - Comment History
+
+    function saveCHComment(Context, URL, Title, ID) {
+        var Username;
+        Username = Context ? Context.previousElementSibling.getElementsByClassName("comment__username")[0].textContent : null;
+        GM_setValue(
+            "CommentHistory",
+            "<div>" +
+            "    You " + (Username ? ("replied to <a class=\"rhBold\" href=\"/user/" + Username + "\">" + Username + "</a> on") : "added a comment to") +
+            "    <a class=\"rhBold\" href=\"" + URL + "\">" + Title + "</a> at" +
+            "    <a class=\"rhBold\" data-timestamp=\"" + Math.floor((new Date().getTime()) / 1000) + "\" href=\"/go/comment/" + ID + "\"></a>." +
+            "</div>" +
+            GM_getValue("CommentHistory")
+        );
     }
 
     // Permanent User Notes
@@ -3807,12 +3808,12 @@
             "https://www.dropbox.com/s/b329z9nbfi9rtqk/1.ico?raw=1",
             "https://www.dropbox.com/s/h3dv3rbhgsswc3v/2.ico?raw=1",
             "https://www.dropbox.com/s/mtr7d729l9h95nm/3.ico?raw=1",
-            "https://www.dropbox.com/s/khdk482xguewt1m/4.ico?raw=1",
+            "https://www.dropbox.com/s/amqedbg69qvs7k6/4.ico?raw=1",
             "https://www.dropbox.com/s/kvguad7ikedyiwj/5.ico?raw=1",
             "https://www.dropbox.com/s/y9i8gw8azdxb7v2/6.ico?raw=1",
             "https://www.dropbox.com/s/5croyms6e407kvk/7.ico?raw=1",
             "https://www.dropbox.com/s/33hkfd1z4leymhy/8.ico?raw=1",
-            "https://www.dropbox.com/s/v1ygqshzoqlids4/9.ico?raw=1",
+            "https://www.dropbox.com/s/e8rwpy5gc39t3f2/9.ico?raw=1",
             "https://www.dropbox.com/s/8fm8m4lhwa1zy6r/0.ico?raw=1"
         ];
         Interval = setInterval(function() {
@@ -4271,9 +4272,9 @@
             Container = Matches[I].getElementsByClassName("table__column--width-fill")[0].firstElementChild;
             if (Comments[Key].Highlighted) {
                 Matches[I].classList.add("DHHighlight");
-                Container.insertAdjacentHTML("afterBegin", "<i class=\"fa fa-star-o DHIcon\" title=\"Unhighlight discussion.\"></i>");
+                Container.insertAdjacentHTML("afterBegin", "<i class=\"fa fa-star DHIcon\" title=\"Unhighlight discussion.\"></i>");
             } else {
-                Container.insertAdjacentHTML("afterBegin", "<i class=\"fa fa-star DHIcon\" title=\"Highlight discussion.\"></i>");
+                Container.insertAdjacentHTML("afterBegin", "<i class=\"fa fa-star-o DHIcon\" title=\"Highlight discussion.\"></i>");
             }
             setDHIcon(Container.firstElementChild, Matches[I], Key);
         }
@@ -4520,7 +4521,7 @@
                 }
             }
         }
-        GM_setValue("Comments", Comments);
+        GM_setValue(ID, Comments);
     }
 
     function markCTRead(CTButton, ID, Key) {
