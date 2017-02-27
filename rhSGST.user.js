@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.9.5
+// @version 4.10
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -121,6 +121,9 @@
         },
         UGS: {
             Name: "Unsent Gifts Sender"
+        },
+        SGG: {
+            Name: "Stickied Giveaway Groups"
         },
         HIR: {
             Name: "Header Icons Refresher",
@@ -313,7 +316,8 @@
             Comments_ST: {},
             Emojis: "",
             Rerolls: [],
-            CommentHistory: ""
+            CommentHistory: "",
+            StickiedGroups: []
         };
         rhSGST = GM_getValue("rhSGST");
         for (Key in DefaultValues) {
@@ -361,7 +365,7 @@
             if (CommentBox) {
                 addDEDButton(CommentBox);
             }
-        } else if (GM_getValue("AGS") && SG && Path.match(/^\/($|giveaways(?!\/(wishlist|created|entered|won)))/)) {
+        } else if (GM_getValue("AGS") && SG && Path.match(/^\/($|giveaways(?!\/(wishlist|created|entered|won|new)))/)) {
             addAGSPanel();
         } else if (GM_getValue("EGH") && Path.match(/^\/giveaway\//)) {
             setEGHHighlighter();
@@ -372,6 +376,9 @@
             }
             if (GM_getValue("PR")) {
                 setPRRefresher();
+            }
+            if (GM_getValue("SGG") && Path.match(/^\/giveaways\/new/)) {
+                setSGGGroups();
             }
         }
         Users = {};
@@ -2201,11 +2208,7 @@
         };
         PUNIcon = PUNButton.firstElementChild;
         SavedUser = getUser(User);
-        if (SavedUser && SavedUser.Notes) {
-            PUNIcon.classList.add("fa-sticky-note");
-        } else {
-            PUNIcon.classList.add("fa-sticky-note-o");
-        }
+        PUNIcon.classList.add((SavedUser && SavedUser.Notes) ? "fa-sticky-note" : "fa-sticky-note-o");
         PUNButton.addEventListener("click", function() {
             var Popup;
             Popup = createPopup(true);
@@ -3792,6 +3795,58 @@
                 sendUGSGifts(UGS, ++I, N, J, Keys, Winners, Callback);
             });
         }
+    }
+
+    // Stickied Giveaway Groups
+
+    function setSGGGroups() {
+        var StickiedGroups, SGG, Matches, I, N, Context, ID;
+        StickiedGroups = GM_getValue("StickiedGroups");
+        SGG = {
+            Container: document.getElementsByClassName("form__groups")[0]
+        };
+        SGG.Separator = SGG.Container.firstElementChild.nextElementSibling;
+        Matches = SGG.Container.getElementsByClassName("form__group--steam");
+        for (I = 0, N = Matches.length; I < N; ++I) {
+            Context = Matches[I];
+            ID = Context.getAttribute("data-group-id");
+            if (StickiedGroups.indexOf(ID) < 0) {
+                setSGGButton(Context, true, ID, SGG);
+            } else {
+                if (Context == SGG.Separator) {
+                    SGG.Separator = SGG.Separator.nextElementSibling
+                }
+                SGG.Container.insertBefore(Context, SGG.Separator);
+                setSGGButton(Context, false, ID, SGG);
+            }
+        }
+    }
+
+    function setSGGButton(Context, Sticky, ID, SGG) {
+        Context.insertAdjacentHTML(
+            "afterBegin",
+            "<a class=\"" + (Sticky ? "SGGSticky" : "SGGUnsticky") + "\" title=\"" + (Sticky ? "Sticky" : "Unsticky") + " group.\">" +
+            "    <i class=\"fa fa-thumb-tack\"></i>" +
+            "</a>"
+        );
+        Context.firstElementChild.addEventListener("click", function(Event) {
+            var StickiedGroups;
+            Event.stopPropagation();
+            StickiedGroups = GM_getValue("StickiedGroups");
+            Sticky ? StickiedGroups.push(ID) : StickiedGroups.splice(StickiedGroups.indexOf(ID), 1);
+            GM_setValue("StickiedGroups", StickiedGroups);
+            Event.currentTarget.remove();
+            if (Sticky) {
+                if (Context == SGG.Separator) {
+                    SGG.Separator = SGG.Separator.nextElementSibling;
+                }
+                SGG.Container.insertBefore(Context, SGG.Separator);
+            } else {
+                SGG.Container.insertBefore(Context, SGG.Separator);
+                SGG.Separator = SGG.Separator.previousElementSibling;
+            }
+            setSGGButton(Context, !Sticky, ID, SGG);
+        });
     }
 
     // Header Icons Refresher
@@ -12935,6 +12990,13 @@
             "}" +
             ".APBox .featured__table__row {" +
             "    padding: 2px;" +
+            "}" +
+            ".SGGSticky {" +
+            "    margin: 0 5px 0 0;" +
+            "}" +
+            ".SGGUnsticky {" +
+            "    margin: 0 5px 0 0;" +
+            "    opacity: 0.5;" +
             "}" +
             ".AGSPanel {" +
             "    margin: 0 0 15px 0;" +
