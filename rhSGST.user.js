@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.10
+// @version 4.11
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -121,6 +121,9 @@
         },
         UGS: {
             Name: "Unsent Gifts Sender"
+        },
+        GTS: {
+            Name: "Giveaway Templates"
         },
         SGG: {
             Name: "Stickied Giveaway Groups"
@@ -317,7 +320,8 @@
             Emojis: "",
             Rerolls: [],
             CommentHistory: "",
-            StickiedGroups: []
+            StickiedGroups: [],
+            Templates: []
         };
         rhSGST = GM_getValue("rhSGST");
         for (Key in DefaultValues) {
@@ -377,8 +381,13 @@
             if (GM_getValue("PR")) {
                 setPRRefresher();
             }
-            if (GM_getValue("SGG") && Path.match(/^\/giveaways\/new/)) {
-                setSGGGroups();
+            if (Path.match(/^\/giveaways\/new/) && !document.getElementsByClassName("table--summary")[0]) {
+                if (GM_getValue("GTS")) {
+                    addGTSButtons();
+                }
+                if (GM_getValue("SGG")) {
+                    setSGGGroups();
+                }
             }
         }
         Users = {};
@@ -579,7 +588,7 @@
             Callback: setATTimestamp
         }, {
             Check: GM_getValue("CFH"),
-            Query: "[name='description']",
+            Query: "textarea[name='description']",
             Callback: addCFHPanel
         }, {
             Check: GM_getValue("MR") || (GM_getValue("RFI") && Path.match(/^\/messages/)),
@@ -1068,6 +1077,13 @@
     function setFadedGiveaway(Context) {
         Context.classList.remove("is-faded");
         Context.classList.add("rhFaded");
+    }
+
+    function formatDate(EntryDate) {
+        var Hours;
+        Hours = EntryDate.getHours();
+        return (["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][EntryDate.getMonth()] + " " + EntryDate.getDate() + ", " + EntryDate.getFullYear() + " " +
+                ((Hours > 12) ? ((Hours - 12) + ":" + EntryDate.getMinutes() + " pm") : ((!Hours ? 12 : Hours) + ":" + EntryDate.getMinutes() + " am")));
     }
 
     function createPopup(Temp) {
@@ -3797,6 +3813,160 @@
         }
     }
 
+    // Giveaway Templates
+
+    function addGTSButtons() {
+        var GTS;
+        GTS = {
+            Name: ""
+        };
+        addGTSView(GTS);
+        addGTSSave(GTS);
+    }
+
+    function addGTSView(GTS) {
+        var Context, GTSContainer, GTSView, Popout, Templates, N, I;
+        Context = document.getElementsByClassName("page__heading")[0];
+        Context.insertAdjacentHTML(
+            "afterBegin",
+            "<div>" +
+            "    <a class=\"GTSView\" title=\"View saved templates.\">" +
+            "        <i class=\"fa fa-file\"></i>" +
+            "    </a>" +
+            "</div>"
+        );
+        GTSContainer = Context.firstElementChild;
+        GTSView = GTSContainer.firstElementChild;
+        Popout = createPopout(GTSContainer);
+        Templates = GM_getValue("Templates");
+        N = Templates.length;
+        if (N) {
+            for (I = 0; I < N; ++I) {
+                Popout.Popout.insertAdjacentHTML(
+                    "beforeEnd",
+                    "<div class=\"GTSTemplate\">" + Templates[I].Name +
+                    "    <i class=\"fa fa-check-circle GTSApply\" title=\"Apply template.\"></i>" +
+                    "    <i class=\"fa fa-trash GTSDelete\" title=\"Delete template.\"></i>" +
+                    "</div>");
+                setGTSTemplate(Popout.Popout.lastElementChild, Templates[I], GTS);
+            }
+        } else {
+            Popout.Popout.textContent = "No templates saved.";
+        }
+        GTSView.addEventListener("click", function() {
+            Popout.popOut(GTSContainer);
+        });
+    }
+
+    function setGTSTemplate(GTSTemplate, Template, GTS) {
+        GTSTemplate.firstElementChild.addEventListener("click", function() {
+            var CurrentDate, Context, Groups, I, N;
+            CurrentDate = Date.now();
+            document.querySelector("[name='start_time']").value = formatDate(new Date(CurrentDate + Template.Delay));
+            document.querySelector("[name='end_time']").value = formatDate(new Date(CurrentDate + Template.Delay + Template.Duration));
+            document.querySelector("[data-checkbox-value='" + Template.Region + "']").click();
+            document.querySelector("[data-checkbox-value='" + Template.Type + "']").click();
+            if (Template.Type == "groups") {
+                if (Template.Whitelist) {
+                    Context = document.getElementsByClassName("form__group--whitelist")[0];
+                    if (!Context.classList.contains("is-selected")) {
+                        Context.click();
+                    }
+                }
+                if (Template.Groups) {
+                    Groups = Template.Groups.trim().split(/\s/);
+                    for (I = 0, N = Groups.length; I < N; ++I) {
+                        Context = document.querySelector("[data-group-id='" + Groups[I] + "']");
+                        if (!Context.classList.contains("is-selected")) {
+                            Context.click();
+                        }
+                    }
+                }
+            }
+            if (Template.Level > 0) {
+                document.getElementsByClassName("ui-slider-range")[0].style.width = "100%";
+                document.getElementsByClassName("form__level")[0].textContent = "level " + Template.Level;
+                document.getElementsByClassName("form__input-description--no-level")[0].classList.add("is-hidden");
+                document.getElementsByClassName("form__input-description--level")[0].classList.remove("is-hidden");
+            } else {
+                document.getElementsByClassName("ui-slider-range")[0].style.width = "0%";
+                document.getElementsByClassName("form__input-description--level")[0].classList.add("is-hidden");
+                document.getElementsByClassName("form__input-description--no-level")[0].classList.remove("is-hidden");
+            }
+            document.getElementsByClassName("ui-slider-handle")[0].style.left = (Template.Level * 10) + "%";
+            document.querySelector("[name='contributor_level']").value = Template.Level;
+            document.querySelector("[name='description']").value = Template.Description;
+            GTS.Name = Template.Name;
+        });
+        GTSTemplate.lastElementChild.addEventListener("click", function() {
+            var Templates, I, N;
+            Templates = GM_getValue("Templates");
+            for (I = 0, N = Templates.length; (I < N) && (Templates[I].Name != Template.Name); ++I);
+            Templates.splice(I, 1);
+            GM_setValue("Templates", Templates);
+            if (GTS.Name == Template.Name) {
+                GTS.Name = "";
+            }
+            GTSTemplate.remove();
+        });
+    }
+
+    function addGTSSave(GTS) {
+        var Context;
+        Context = document.getElementsByClassName("form__submit-button")[0];
+        Context.insertAdjacentHTML("afterEnd", "<div class=\"GTSSave\"></div>");
+        createButton(Context.nextElementSibling, "fa-file", "Save Template", "", "", function(Callback) {
+            var Popup;
+            Callback();
+            Popup = createPopup(true);
+            Popup.Icon.classList.add("fa-file");
+            Popup.Title.textContent = "Save template:";
+            Popup.TextInput.classList.remove("rhHidden");
+            Popup.TextInput.insertAdjacentHTML("afterEnd", createDescription("Enter a name for this template."));
+            Popup.TextInput.value = GTS.Name;
+            createButton(Popup.Button, "fa-check", "Save", "fa-circle-o-notch fa-spin", "Saving...", function(Callback) {
+                var StartTime, Delay, Template, Templates, I, N;
+                if (Popup.TextInput.value) {
+                    StartTime = new Date(document.querySelector("[name='start_time']").value).getTime();
+                    Delay = StartTime - (new Date().getTime());
+                    Template = {
+                        Name: Popup.TextInput.value,
+                        Delay: (Delay > 0) ? Delay : 0,
+                        Duration: (new Date(document.querySelector("[name='end_time']").value).getTime()) - StartTime,
+                        Region: document.querySelector("[name='region']").value,
+                        Type: document.querySelector("[name='who_can_enter']").value,
+                        Whitelist: document.querySelector("[name='whitelist']").value,
+                        Groups: document.querySelector("[name='group_string']").value,
+                        Level: document.querySelector("[name='contributor_level']").value,
+                        Description: document.querySelector("[name='description']").value
+                    };
+                    Templates = GM_getValue("Templates");
+                    if (GTS.Name == Popup.TextInput.value) {
+                        for (I = 0, N = Templates.length; (I < N) && (Templates[I].Name != GTS.Name); ++I);
+                        if (I < N) {
+                            Templates[I] = Template;
+                        } else {
+                            Templates.push(Template);
+                        }
+                    } else {
+                        Templates.push(Template);
+                    }
+                    GM_setValue("Templates", Templates);
+                    Callback();
+                    Popup.Close.click();
+                } else {
+                    Popup.Progress.innerHTML =
+                        "<i class=\"fa fa-times-circle\"></i> " +
+                        "<span>You must enter a name.</span>";
+                    Callback();
+                }
+            });
+            Popup.popUp(function() {
+                Popup.TextInput.focus();
+            });
+        });
+    }
+
     // Stickied Giveaway Groups
 
     function setSGGGroups() {
@@ -3814,7 +3984,7 @@
                 setSGGButton(Context, true, ID, SGG);
             } else {
                 if (Context == SGG.Separator) {
-                    SGG.Separator = SGG.Separator.nextElementSibling
+                    SGG.Separator = SGG.Separator.nextElementSibling;
                 }
                 SGG.Container.insertBefore(Context, SGG.Separator);
                 setSGGButton(Context, false, ID, SGG);
@@ -3833,18 +4003,19 @@
             var StickiedGroups;
             Event.stopPropagation();
             StickiedGroups = GM_getValue("StickiedGroups");
-            Sticky ? StickiedGroups.push(ID) : StickiedGroups.splice(StickiedGroups.indexOf(ID), 1);
-            GM_setValue("StickiedGroups", StickiedGroups);
-            Event.currentTarget.remove();
             if (Sticky) {
+                StickiedGroups.push(ID);
                 if (Context == SGG.Separator) {
                     SGG.Separator = SGG.Separator.nextElementSibling;
                 }
                 SGG.Container.insertBefore(Context, SGG.Separator);
             } else {
+                StickiedGroups.splice(StickiedGroups.indexOf(ID), 1);
                 SGG.Container.insertBefore(Context, SGG.Separator);
                 SGG.Separator = SGG.Separator.previousElementSibling;
             }
+            GM_setValue("StickiedGroups", StickiedGroups);
+            Event.currentTarget.remove();
             setSGGButton(Context, !Sticky, ID, SGG);
         });
     }
@@ -12915,7 +13086,7 @@
             "    height: 14px;" +
             "    width: 14px;" +
             "}" +
-            ".ESPanel .pagination__navigation >*, .ESPanel .pagination_navigation >*, .ESRefresh, .ESPause, .UHButton, .PUNButton, .WBCButton, .NAMWCButton, .NRFButton, .UGSButton," +
+            ".ESPanel .pagination__navigation >*, .ESPanel .pagination_navigation >*, .ESRefresh, .ESPause, .UHButton, .PUNButton, .WBCButton, .NAMWCButton, .NRFButton, .GTSView, .UGSButton," +
             ".EGBDescription, .CTGoToUnread, .CTMarkRead, .CTMarkVisited, .MCBPButton, .MPPButton, .ASButton {" +
             "    cursor: pointer;" +
             "    display: inline-block;" +
@@ -12991,6 +13162,13 @@
             ".APBox .featured__table__row {" +
             "    padding: 2px;" +
             "}" +
+            ".GTSApply, .GTSDelete, .CTButton {" +
+            "    cursor: pointer;" +
+            "}" +
+            ".GTSSave {" +
+            "    display: inline-block;" +
+            "    margin: 0 0 0 5px;" +
+            "}" +
             ".SGGSticky {" +
             "    margin: 0 5px 0 0;" +
             "}" +
@@ -13062,9 +13240,6 @@
             ".DHIcon {" +
             "    cursor: pointer;" +
             "    margin: 0 5px 0 0;" +
-            "}" +
-            ".CTButton {" +
-            "    cursor: pointer;" +
             "}" +
             ".comment__actions .CTButton {" +
             "    margin: 0 0 0 10px;" +
