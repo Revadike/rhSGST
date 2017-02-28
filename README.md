@@ -31,6 +31,7 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 * [Username History](#username-history)
 * [Permanent User Notes](#permanent-user-notes)
 * [Permanent User Tags](#permanent-user-tags)
+* [Multi-Tag](#multi--tag)
 * [Whitelist / Blacklist Highlighter](#whitelist--blacklist-highlighter)
 * [Whitelist / Blacklist Checker](#whitelist--blacklist-checker)
 * [Real Won / Sent CV Links](#real-won--sent-cv-links)
@@ -154,6 +155,16 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 * Unlike the permanent user notes, the tags are not tied to an user's SteamID64, because that information is only available in the profile page, but they are still permament because upon adding a tag to an user, it automatically detects username changes and returns any old tags you might have saved for that user before they changed their username.
 * While the tags are not tied to an user's SteamID64, it still has to retrieve the user's profile page in order to save to the storage, so if you're adding tags to an user for the first time, it might take a while to do so.
 * Separation of tags is purely cosmetic.
+
+### Multi-Tag
+
+`(steamgifts|steamtrades).com/*`
+
+![](http://i.imgur.com/aZRQkxr.png)
+![](blob:http://imgur.com/cadb3ff3-9f94-41ab-a302-d3ce73ea712e)
+
+* Allows you to tag multiple users / games at the same time.
+* It goes without saying that this feature only works if either Permanent User Notes or Game Tags are enabled.
 
 ### Whitelist / Blacklist Highlighter
 

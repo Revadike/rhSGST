@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.11
+// @version 4.12
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -88,6 +88,9 @@
         },
         PUT: {
             Name: "Permanent User Tags"
+        },
+        MT: {
+            Name: "Multi-Tag"
         },
         WBH: {
             Name: "Whitelist / Blacklist Highlighter"
@@ -393,6 +396,11 @@
         Users = {};
         Games = {};
         APBoxes = {};
+        MT = {
+            Checkboxes: {},
+            UsersSelected: [],
+            GamesSelected: []
+        };
         loadEndlessFeatures(document);
         setTimeout(goToComment, 1000);
     }
@@ -518,6 +526,10 @@
             Check: GM_getValue("ES"),
             Name: "ESPanel",
             Callback: addESPanel
+        }, {
+            Check: GM_getValue("MT") && (GM_getValue("PUT") || GM_getValue("GT")) && Object.keys(CurrentUsers).length,
+            Name: "MTContainer",
+            Callback: addMTContainer
         }, {
             Check: GM_getValue("UGS") && Path.match(/\/giveaways\/created/),
             Name: "UGSButton",
@@ -1080,10 +1092,12 @@
     }
 
     function formatDate(EntryDate) {
-        var Hours;
+        var Hours, Minutes;
         Hours = EntryDate.getHours();
+        Minutes = EntryDate.getMinutes();
+        Minutes = (Minutes > 9) ? Minutes : ("0" + Minutes);
         return (["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][EntryDate.getMonth()] + " " + EntryDate.getDate() + ", " + EntryDate.getFullYear() + " " +
-                ((Hours > 12) ? ((Hours - 12) + ":" + EntryDate.getMinutes() + " pm") : ((!Hours ? 12 : Hours) + ":" + EntryDate.getMinutes() + " am")));
+                ((Hours > 12) ? ((Hours - 12) + ":" + Minutes + " pm") : ((!Hours ? 12 : Hours) + ":" + Minutes + " am")));
     }
 
     function createPopup(Temp) {
@@ -1149,9 +1163,12 @@
 
     function createPopout(Context) {
         var Popout;
-        Context.insertAdjacentHTML("beforeEnd", "<div class=\"global__image-outer-wrap page_heading_btn rhPopout rhHidden\"></div>");
+        Context.insertAdjacentHTML("beforeEnd", "<div class=\"page__outer-wrap page_outer_wrap rhPopout rhHidden\"></div>");
         Popout = {
             Popout: Context.lastElementChild,
+            CustomRule: function(Target) {
+                return true;
+            },
             popOut: function(Context, Callback) {
                 if (Callback) {
                     Callback(Popout.Popout);
@@ -1165,7 +1182,7 @@
             }
         };
         document.addEventListener("click", function(Event) {
-            if (!Popout.Popout.classList.contains("rhHidden") && document.body.contains(Event.target) && !Popout.Popout.parentElement.contains(Event.target)) {
+            if (!Popout.Popout.classList.contains("rhHidden") && document.body.contains(Event.target) && !Popout.Popout.parentElement.contains(Event.target) && Popout.CustomRule(Event.target)) {
                 Popout.Popout.classList.add("rhHidden");
             }
         });
@@ -1265,7 +1282,21 @@
             }
         }
 
-        return Input;
+        return {
+            Checkbox: Input,
+            check: function() {
+                Input.checked = true;
+                setCheckboxEnabled();
+            },
+            uncheck: function() {
+                Input.checked = false;
+                setCheckboxEnabled();
+            },
+            toggle: function() {
+                Input.checked = Input.checked ? false : true;
+                setCheckboxEnabled();
+            }
+        };
     }
 
     function createOptions(Context, Element, Options) {
@@ -1290,7 +1321,7 @@
         Checkbox = Element[Name].firstElementChild;
         Key = Option.Key;
         ID = Option.ID;
-        Element[Key] = createCheckbox(Checkbox, GM_getValue(ID));
+        Element[Key] = createCheckbox(Checkbox, GM_getValue(ID)).Checkbox;
         Dependency = Option.Dependency;
         Checkbox.addEventListener("click", function() {
             GM_setValue(ID, Element[Key].checked);
@@ -1551,18 +1582,24 @@
             window.alert("Exported!");
         });
         SMManageTags.addEventListener("click", function() {
-            var Popup, SMManageTagsPopup;
+            var Popup, MT, SMManageTagsPopup;
             Popup = createPopup(true);
             Popup.Icon.classList.add("fa-cog");
             Popup.Title.textContent = "Manage tags:";
             Popup.TextInput.classList.remove("rhHidden");
+            Popup.TextInput.insertAdjacentHTML("beforeBegin", "<div class=\"page__heading\"></div>");
+            MT = {};
+            addMTContainer(Popup.TextInput.previousElementSibling, MT, {
+                Popup: Popup
+            });
             Popup.TextInput.insertAdjacentHTML(
                 "afterEnd",
                 createDescription("Filter users by tag (use commas to separate filters, for example: Filter1, Filter2, ...). Filters are not case sensitive.")
             );
             SMManageTagsPopup = Popup.popUp(function() {
-                var SavedUsers, Tags, I, N, SavedTags, J, NumTags, Key;
+                var SavedUsers, MTUsers, Tags, I, N, Context, Username, SavedTags, J, NumTags, Key;
                 SavedUsers = GM_getValue("Users");
+                MTUsers = {};
                 Tags = {};
                 for (I = 0, N = SavedUsers.length; I < N; ++I) {
                     if (SavedUsers[I].Tags) {
@@ -1572,6 +1609,12 @@
                             "    <a href=\"/user/" + SavedUsers[I].Username + "\">" + SavedUsers[I].Username + "</a>" +
                             "</div>"
                         );
+                        Context = Popup.Results.lastElementChild.firstElementChild;
+                        Username = SavedUsers[I].Username;
+                        if (!MTUsers[Username]) {
+                            MTUsers[Username] = [];
+                        }
+                        MTUsers[Username].push(Context);
                         SMManageTagsPopup.reposition();
                         SavedTags = SavedUsers[I].Tags.split(/,\s/g);
                         for (J = 0, NumTags = SavedTags.length; J < NumTags; ++J) {
@@ -1583,9 +1626,13 @@
                         }
                     }
                 }
+                addMTCheckboxes(MTUsers, "User", "beforeBegin", "previousElementSibling", MT);
                 loadEndlessFeatures(Popup.Results);
                 Popup.TextInput.addEventListener("input", function() {
-                    var Matches, Filters;
+                    var MTUsers, Matches, Filters, Context, Username;
+                    selectMTCheckboxes(MT.UserCheckboxes, "uncheck", MT, "User");
+                    removeMTCheckboxes("User", MT);
+                    MTUsers = {};
                     Matches = Popup.Results.getElementsByClassName("SMTag");
                     for (I = 0, N = Matches.length; I < N; ++I) {
                         if (Matches[I]) {
@@ -1599,13 +1646,30 @@
                             Key = Filters[I].toLowerCase();
                             if (Tags[Key]) {
                                 for (J = 0, NumTags = Tags[Key].length; J < NumTags; ++J) {
-                                    Popup.Results.children[Tags[Key][J]].classList.add("SMTag");
+                                    Context = Popup.Results.children[Tags[Key][J]];
+                                    Context.classList.add("SMTag");
+                                    Context = Context.querySelector("a[href*='/user/']");
+                                    Username = Context.textContent;
+                                    if (!MTUsers[Username]) {
+                                        MTUsers[Username] = [];
+                                    }
+                                    MTUsers[Username].push(Context);
                                 }
                             }
                         }
                     } else {
                         Popup.Results.classList.remove("SMTags");
+                        Matches = Popup.Results.querySelectorAll("a[href*='/user/']");
+                        for (I = 0, N = Matches.length; I < N; ++I) {
+                            Context = Matches[I];
+                            Username = Context.textContent;
+                            if (!MTUsers[Username]) {
+                                MTUsers[Username] = [];
+                            }
+                            MTUsers[Username].push(Context);
+                        }
                     }
+                    addMTCheckboxes(MTUsers, "User", "beforeBegin", "previousElementSibling", MT);
                     SMManageTagsPopup.reposition();
                 });
             });
@@ -1660,7 +1724,7 @@
             "<div class=\"form__row__indent SMFeatures rhHidden\"></div>"
         );
         Checkbox = Menu.firstElementChild;
-        CheckboxInput = createCheckbox(Checkbox, GM_getValue(ID));
+        CheckboxInput = createCheckbox(Checkbox, GM_getValue(ID)).Checkbox;
         SMFeatures = Menu.lastElementChild;
         for (Key in Feature) {
             if (Key != "Name") {
@@ -2151,7 +2215,7 @@
     // UH - Username History
 
     function addUHContainer(Context, SteamID64, Username) {
-        var UHContainer, UHButton, UHBox, UHList;
+        var UHContainer, UHButton, UHBox, UHList, URL;
         Context = Context.getElementsByClassName("featured__heading__medium")[0];
         Context.insertAdjacentHTML(
             "afterEnd",
@@ -2176,8 +2240,8 @@
                 UHList.innerHTML =
                     "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
                     "<span>Loading usernames...</span>";
-                makeRequest(null, "https://script.google.com/macros/s/AKfycbzvOuHG913mRIXOsqHIeAuQUkLYyxTHOZim5n8iP-k80iza6g0/exec?Action=1&SteamID64=" + SteamID64 + "&Username=" + Username,
-                            UHList, function(Response) {
+                URL = "https://script.google.com/macros/s/AKfycbzvOuHG913mRIXOsqHIeAuQUkLYyxTHOZim5n8iP-k80iza6g0/exec?Action=1&SteamID64=" + SteamID64 + "&Username=" + Username;
+                makeRequest(null, URL, UHList, function(Response) {
                     UHList.innerHTML = "<li>" + parseJSON(Response.responseText).Usernames.join("</li><li>") + "</li>";
                 });
             }
@@ -2316,6 +2380,307 @@
                     Context = Container;
                 }
                 Context.parentElement.getElementsByClassName("PUTTags")[0].innerHTML = HTML;
+            }
+        }
+    }
+
+    // Multi-Tag
+
+    function addMTContainer(Context, MT, SM) {
+        var MTContainer, MTButton, MTBox, MTUsers, MTGames, MTAll, MTNone, MTInverse, MTUsersCheckbox, MTGamesCheckbox, Popup;
+        if (!MT) {
+            MT = {};
+        }
+        MT.UserCheckboxes = {};
+        MT.GameCheckboxes = {};
+        MT.UsersSelected = [];
+        MT.GamesSelected = [];
+        Context.insertAdjacentHTML(
+            "afterBegin",
+            "<div class=\"MTContainer" + (SM ? " rhHidden" : "") + "\">" +
+            "    <a class=\"MTButton page_heading_btn\">" +
+            "        <i class=\"fa fa-tags\"></i>" +
+            "    </a>" +
+            "</div>"
+        );
+        MTContainer = Context.firstElementChild;
+        MTButton = MTContainer.firstElementChild;
+        MTBox = createPopout(MTContainer);
+        MTBox.CustomRule = function(Target) {
+            return (!Target.closest(".MTUserCheckbox") && !Target.closest(".MTGameCheckbox"));
+        };
+        MTBox.Popout.classList.add("MTBox");
+        Context = SM ? SM.Popup.Options : MTBox.Popout;
+        Context.innerHTML =
+            "<div" + ((GM_getValue("PUT") && !SM) ? "" : " class=\"rhHidden\"") + "><span class=\"MTUsers\"></span> Enable selection for user tags.</div>" +
+            "<div" + ((GM_getValue("GT") && !SM) ? "" : " class=\"rhHidden\"") + "><span class=\"MTGames\"></span> Enable selection for game tags.</div>" +
+            "<div><i class=\"fa fa-check-square-o MTAll\"></i> Select all.</div>" +
+            "<div><i class=\"fa fa-square-o\ MTNone\"></i> Select none.</div>" +
+            "<div><i class=\"fa fa-minus-square-o MTInverse\"></i> Select inverse.</div>" +
+            "<div><span class=\"MTCount\">0</span> selected.</div>" +
+            "<div class=\"MTTag\"></div>";
+        MTUsers = Context.getElementsByClassName("MTUsers")[0];
+        MTGames = Context.getElementsByClassName("MTGames")[0];
+        MTAll = Context.getElementsByClassName("MTAll")[0];
+        MTNone = Context.getElementsByClassName("MTNone")[0];
+        MTInverse = Context.getElementsByClassName("MTInverse")[0];
+        MT.Count = Context.getElementsByClassName("MTCount")[0];
+        MT.Tag = Context.getElementsByClassName("MTTag")[0];
+        MTUsersCheckbox = createCheckbox(MTUsers);
+        MTGamesCheckbox = createCheckbox(MTGames);
+        setMTCheckboxes(MTUsers, MTUsersCheckbox.Checkbox, Users, "User", "beforeBegin", "previousElementSibling", MT);
+        setMTCheckboxes(MTGames, MTGamesCheckbox.Checkbox, Games, "Game", "afterBegin", "firstElementChild", MT);
+        setMTSelect(MTAll, MT, "check");
+        setMTSelect(MTNone, MT, "uncheck");
+        setMTSelect(MTInverse, MT, "toggle");
+        MT.Tag.classList.add("rhHidden");
+        Popup = createPopup();
+        Popup.Icon.classList.add("fa-tags");
+        Popup.TextInput.classList.remove("rhHidden");
+        Popup.TextInput.insertAdjacentHTML(
+            "afterEnd",
+            createDescription(
+                "Use commas to separate tags, for example: Tag1, Tag2, ...<br/><br/>" +
+                "A [*] tag means that the selected users / games have individual tags (not shared between all of them). Removing the [*] tag will delete those individual tags."
+            )
+        );
+        createButton(MT.Tag, "fa-tags", "Multi-Tag", "", "", function(Callback) {
+            var Tags, Shared, I, N, UserID, User, SavedUser, SavedTags, J, NumTags, SavedTag, SavedGames, SavedGame, Game, Key, Individual;
+            Callback();
+            if (!MTButton.classList.contains("rhBusy")) {
+                Popup.Title.textContent = "Multi-tag " + MT.UsersSelected.length + " users and " + MT.GamesSelected.length + " games:";
+                Tags = {};
+                MT.UserTags = {};
+                Shared = [];
+                for (I = 0, N = MT.UsersSelected.length; I < N; ++I) {
+                    UserID = MT.UsersSelected[I];
+                    User = {};
+                    User[SG ? "Username" : "SteamID64"] = UserID;
+                    SavedUser = getUser(User);
+                    if (SavedUser && SavedUser.Tags) {
+                        SavedTags = SavedUser.Tags.split(/,\s/);
+                        Tags[UserID] = MT.UserTags[UserID] = SavedTags;
+                        for (J = 0, NumTags = SavedTags.length; J < NumTags; ++J) {
+                            SavedTag = SavedTags[J];
+                            if (Shared.indexOf(SavedTag) < 0) {
+                                Shared.push(SavedTag);
+                            }
+                        }
+                    } else {
+                        Tags[UserID] = MT.UserTags[UserID] = "";
+                    }
+                }
+                SavedGames = GM_getValue("Games");
+                MT.GameTags = {};
+                for (I = 0, N = MT.GamesSelected.length; I < N; ++I) {
+                    Game = MT.GamesSelected[I];
+                    SavedGame = SavedGames[Game];
+                    if (SavedGame && SavedGame.Tags) {
+                        SavedTags = SavedGame.Tags.split(/,\s/);
+                        Tags[Game] = MT.GameTags[Game] = SavedTags;
+                        for (J = 0, NumTags = SavedTags.length; I < NumTags; ++I) {
+                            SavedTag = SavedTags[I];
+                            if (Shared.indexOf(SavedTag) < 0) {
+                                Shared.push(SavedTag);
+                            }
+                        }
+                    } else {
+                        Tags[Game] = MT.GameTags[Game] = "";
+                    }
+                }
+                for (Key in Tags) {
+                    Shared = Shared.filter(function(N) {
+                        if (Tags[Key].indexOf(N) >= 0) {
+                            return true;
+                        } else {
+                            Individual = true;
+                            return false;
+                        }
+                    });
+                }
+                for (Key in Tags) {
+                    for (I = 0, N = Shared.length; I < N; ++I) {
+                        J = Tags[Key].indexOf(Shared[I]);
+                        if (J >= 0) {
+                            Tags[Key].splice(J, 1);
+                        }
+                    }
+                }
+                Popup.TextInput.value = Shared.length ? (Shared.join(", ") + (Individual ? ", [*]" : "")) : (Individual ? "[*]" : "");
+            }
+            Popup.popUp(function() {
+                Popup.TextInput.focus();
+            });
+        });
+        createButton(Popup.Button, "fa-check", "Save", "fa-times-circle", "Cancel", function(Callback) {
+            var Shared, I, Individual, Keys;
+            MT.Canceled = false;
+            MTButton.classList.add("rhBusy");
+            Shared = Popup.TextInput.value.replace(/(,\s*)+/g, function(Match, P1, Offset, String) {
+                return (((Offset === 0) || (Offset == (String.length - Match.length))) ? "" : ", ");
+            }).split(", ");
+            I = Shared.indexOf("[*]");
+            if (I >= 0) {
+                Shared.splice(I, 1);
+                Individual = true;
+            } else {
+                Individual = false;
+            }
+            Shared = Shared.join(", ");
+            Keys = Object.keys(MT.UserTags);
+            saveMTUserTags(MT, 0, Keys.length, Keys, Individual, Shared, MT.UserTags, function() {
+                Keys = Object.keys(MT.GameTags);
+                saveMTGameTags(MT, 0, Keys.length, Keys, Individual, Shared, MT.GameTags, function() {
+                    MTButton.classList.remove("rhBusy");
+                    MT.Progress.innerHTML = MT.OverallProgress.innerHTML = "";
+                    Callback();
+                    Popup.Close.click();
+                });
+            });
+        }, function() {
+            clearInterval(MT.Request);
+            clearInterval(MT.Save);
+            MT.Canceled = true;
+            setTimeout(function() {
+                MT.Progress.innerHTML = MT.OverallProgress.innerHTML = "";
+            }, 500);
+            MTButton.classList.remove("rhBusy");
+        });
+        MT.Progress = Popup.Progress;
+        MT.OverallProgress = Popup.OverallProgress;
+        MTButton.addEventListener("click", function() {
+            MTBox.popOut(MTButton);
+        });
+    }
+
+    function setMTCheckboxes(Element, Checkbox, Selection, Type, InsertionPosition, Position, MT) {
+        Element.addEventListener("click", function() {
+            var Key, Matches, I, N, Context, MTCheckbox;
+            if (Checkbox.checked) {
+                addMTCheckboxes(Selection, Type, InsertionPosition, Position, MT);
+            } else {
+                removeMTCheckboxes(Type, MT);
+            }
+        });
+    }
+
+    function addMTCheckboxes(Selection, Type, InsertionPosition, Position, MT) {
+        var Key, Matches, I, N, Context, MTCheckbox;
+        for (Key in Selection) {
+            Matches = Selection[Key];
+            for (I = 0, N = Matches.length; I < N; ++I) {
+                Context = Matches[I];
+                Context.insertAdjacentHTML(InsertionPosition, "<span class=\"MT" + Type + "Checkbox\"></span>");
+                MTCheckbox = createCheckbox(Context[Position]);
+                if (!MT[Type + "Checkboxes"][Key]) {
+                    MT[Type + "Checkboxes"][Key] = [];
+                }
+                MT[Type + "Checkboxes"][Key].push(MTCheckbox);
+                setMTCheckbox(Type, Context[Position], MT, Key, MTCheckbox.Checkbox, MT.Tag);
+            }
+        }
+    }
+
+    function setMTCheckbox(Type, Context, MT, Key, Checkbox) {
+        Context.addEventListener("click", function() {
+            checkMTCheckbox(MT, Type, Key, Checkbox);
+        });
+    }
+
+    function checkMTCheckbox(MT, Type, Key, Checkbox) {
+        var Count, I, Checkboxes, N;
+        Count = parseInt(MT.Count.textContent);
+        I = MT[Type + "sSelected"].indexOf(Key);
+        if (Checkbox.checked) {
+            MT.Count.textContent = ++Count;
+            if (I < 0) {
+                MT[Type + "sSelected"].push(Key);
+            }
+        } else {
+            MT.Count.textContent = --Count;
+            if (I >= 0) {
+                MT[Type + "sSelected"].splice(I, 1);
+            }
+        }
+        Checkboxes = MT[Type + "Checkboxes"][Key];
+        for (I = 0, N = Checkboxes.length; I < N; ++I) {
+            if (Checkboxes[I].Checkbox != Checkbox) {
+                Checkboxes[I].toggle();
+            }
+        }
+        MT.Tag.classList[(Count > 1) ? "remove" : "add"]("rhHidden");
+    }
+
+    function removeMTCheckboxes(Type, MT) {
+        var Matches, I, N;
+        Matches = document.getElementsByClassName("MT" + Type + "Checkbox");
+        for (I = 0, N = Matches.length; I < N; ++I) {
+            Matches[0].remove();
+        }
+        MT[Type + "Checkboxes"] = {};
+        MT[Type + "sSelected"] = [];
+    }
+
+    function setMTSelect(Element, MT, Call) {
+        Element.addEventListener("click", function() {
+            selectMTCheckboxes(MT.UserCheckboxes, Call, MT, "User");
+            selectMTCheckboxes(MT.GameCheckboxes, Call, MT, "Game");
+        });
+    }
+
+    function selectMTCheckboxes(MTCheckboxes, Call, MT, Type) {
+        var Key, Checkbox, Previous, Current;
+        for (Key in MTCheckboxes) {
+            Checkbox = MTCheckboxes[Key][0];
+            Previous = Checkbox.Checkbox.checked;
+            Checkbox[Call]();
+            Current = Checkbox.Checkbox.checked;
+            if (Previous != Current) {
+                checkMTCheckbox(MT, Type, Key, Checkbox.Checkbox);
+            }
+        }
+    }
+
+    function saveMTUserTags(MT, I, N, Keys, Individual, Shared, Tags, Callback) {
+        var UserID, User;
+        if (!MT.Canceled) {
+            MT.OverallProgress.innerHTML =
+                "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
+                "<span>" + I + " of " + N + " users tagged...</span>";
+            if (I < N) {
+                UserID = Keys[I];
+                User = {
+                    Tags: Individual ? (Shared + ", " + Tags[UserID]) : Shared
+                };
+                User[SG ? "Username" : "SteamID64"] = UserID;
+                queueSave(MT, User, function() {
+                    addPUTTags(UserID, getUser(User).Tags);
+                    setTimeout(saveMTUserTags, 0, MT, ++I, N, Keys, Individual, Shared, Tags, Callback);
+                });
+            } else {
+                Callback();
+            }
+        }
+    }
+
+    function saveMTGameTags(MT, I, N, Keys, Individual, Shared, Tags, Callback) {
+        var Game, SavedGames;
+        if (!MT.Canceled) {
+            MT.OverallProgress.innerHTML =
+                "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
+                "<span>" + I + " of " + N + " groups tagged...</span>";
+            if (I < N) {
+                Game = Keys[I];
+                SavedGames = GM_getValue("Games");
+                if (!SavedGames[Game]) {
+                    SavedGames[Game] = {};
+                }
+                SavedGames[Game].Tags = Individual ? (Shared + ", " + Tags[Game]) : Shared;
+                GM_setValue("Games", SavedGames);
+                addGTTags(Game, SavedGames[Game].Tags);
+                setTimeout(saveMTGameTags, 0, MT, ++I, N, Keys, Individual, Shared, Tags, Callback);
+            } else {
+                Callback();
             }
         }
     }
@@ -3860,7 +4225,7 @@
 
     function setGTSTemplate(GTSTemplate, Template, GTS) {
         GTSTemplate.firstElementChild.addEventListener("click", function() {
-            var CurrentDate, Context, Groups, I, N;
+            var CurrentDate, Context, Groups, Matches, I, N, ID, Selected, J;
             CurrentDate = Date.now();
             document.querySelector("[name='start_time']").value = formatDate(new Date(CurrentDate + Template.Delay));
             document.querySelector("[name='end_time']").value = formatDate(new Date(CurrentDate + Template.Delay + Template.Duration));
@@ -3875,9 +4240,13 @@
                 }
                 if (Template.Groups) {
                     Groups = Template.Groups.trim().split(/\s/);
-                    for (I = 0, N = Groups.length; I < N; ++I) {
-                        Context = document.querySelector("[data-group-id='" + Groups[I] + "']");
-                        if (!Context.classList.contains("is-selected")) {
+                    Matches = document.getElementsByClassName("form__group--steam");
+                    for (I = 0, N = Matches.length; I < N; ++I) {
+                        Context = Matches[I];
+                        ID = Context.getAttribute("data-group-id");
+                        Selected = Context.classList.contains("is-selected");
+                        J = Groups.indexOf(ID);
+                        if ((Selected && (J < 0)) || (!Selected && (J >= 0))) {
                             Context.click();
                         }
                     }
@@ -4134,7 +4503,7 @@
             "    <span>Region Restricted</span>" +
             "</div>"
         );
-        RegionRestricted = createCheckbox(AGSPanel.lastElementChild.firstElementChild);
+        RegionRestricted = createCheckbox(AGSPanel.lastElementChild.firstElementChild).Checkbox;
         Context.addEventListener("keydown", function(Event) {
             var Type, URL, Key;
             if (Event.key == "Enter") {
@@ -12994,6 +13363,8 @@
             "}" +
             ".rhPopout {" +
             "    align-self: baseline;" +
+            "    border: 1px solid #ccc;" +
+            "    border-radius: 5px;" +
             "    font-size: 12px;" +
             "    padding: 5px !important;" +
             "    position: absolute;" +
@@ -13086,8 +13457,8 @@
             "    height: 14px;" +
             "    width: 14px;" +
             "}" +
-            ".ESPanel .pagination__navigation >*, .ESPanel .pagination_navigation >*, .ESRefresh, .ESPause, .UHButton, .PUNButton, .WBCButton, .NAMWCButton, .NRFButton, .GTSView, .UGSButton," +
-            ".EGBDescription, .CTGoToUnread, .CTMarkRead, .CTMarkVisited, .MCBPButton, .MPPButton, .ASButton {" +
+            ".ESPanel .pagination__navigation >*, .ESPanel .pagination_navigation >*, .ESRefresh, .ESPause, .UHButton, .PUNButton, .MTButton, .MTAll, .MTNone, .MTInverse, .WBCButton," +
+            ".NAMWCButton, .NRFButton, .GTSView, .UGSButton, .EGBDescription, .CTGoToUnread, .CTMarkRead, .CTMarkVisited, .MCBPButton, .MPPButton, .ASButton {" +
             "    cursor: pointer;" +
             "    display: inline-block;" +
             "}" +
@@ -13101,7 +13472,7 @@
             "    text-align: center;" +
             "    width: 150px !important;" +
             "}" +
-            ".UHBox .featured__table__row__left, .PUTButton i, .CFHPanel span >:first-child >* {" +
+            ".UHBox .featured__table__row__left, .PUTButton i, .MTUserCheckbox i, .MTGameCheckbox i, .CFHPanel span >:first-child >* {" +
             "    margin: 0 !important;" +
             "}" +
             ".PUTButton, .GTButton {" +
@@ -13128,6 +13499,13 @@
             "}" +
             ".PUTTags >:not(:first-child), .CTPanel >:not(:first-child), .GTTags >:not(:first-child) {" +
             "    margin: 0 0 0 5px;" +
+            "}" +
+            ".MTTag {" +
+            "    display: inline-block;" +
+            "}" +
+            ".MTUserCheckbox, .MTGameCheckbox {" +
+            "    display: inline-block;" +
+            "    margin: 0 5px 0 0;" +
             "}" +
             ".NAMWCPositive {" +
             "    color: " + Positive + " !important;" +
@@ -13171,10 +13549,10 @@
             "}" +
             ".SGGSticky {" +
             "    margin: 0 5px 0 0;" +
+            "    opacity: 0.5;" +
             "}" +
             ".SGGUnsticky {" +
             "    margin: 0 5px 0 0;" +
-            "    opacity: 0.5;" +
             "}" +
             ".AGSPanel {" +
             "    margin: 0 0 15px 0;" +
