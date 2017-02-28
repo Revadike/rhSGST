@@ -1,7 +1,6 @@
 # rhSGST
+
 A script that adds some cool features to SteamGifts and SteamTrades.
-<<<<<<< HEAD
-=======
 
 ## Installation
 
@@ -302,15 +301,24 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 
 * Hides entered giveaways.
 
-### Enter Giveaway Button
+### Enter / Leave Giveaway Button
 
 `steamgifts.com/giveaways/*`
 
-![](http://i.imgur.com/E5zh8L0.png)
+* Allows you to enter / leave giveaways directly from the giveaways pages.
 
-* Allows you to enter / leave a giveaway and read its description directly from the giveaways pages.
-* You can enable an option that displays the giveaway description automatically upon entering.
-* Allows you to add a comment to the giveaway upon entering.
+### Giveaway Description / Comment Box Popup
+
+`steamgifts.com/giveaways/*`
+
+* Allows you to view giveaway descriptions and add comments to giveaways directly from the giveaways pages.
+* You can enable an option to show it automatically upon entering a giveaway if Enter / Leave Giveaway Button is enabled.
+
+### Giveaway Winning Chance
+
+`steamgifts.com/(giveaways|giveaways/entered|giveaway)/*`
+
+* Displays your winning chance for a giveaway.
 
 ### Groups Highlighter
 
@@ -453,4 +461,3 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 * All requests from `Whitelist / Blacklist Checker`, `Not Activated / Multiple Wins Checker`, `Not Received Finder` and `Archive Searcher` are limited to 2 per second, to prevent a stress on the SG servers.
 * If you try to leave the page while `Whitelist / Blacklist Checker`, `Not Activated / Multiple Wins Checker`, `Not Received Finder` and `Archive Searcher` are running, you will get a confirmation dialog asking you if you want to leave the page. Additionally, while these features are running, their buttons are faded out.
 * `Whitelist / Blacklist Checker`, `Not Activated / Multiple Wins Checker`, `Not Received Finder` and `Archive Searcher` allow for real-time options. For example, if you start `Whitelist / Blacklist Checker` with `Also check for whitelist.` enabled, but in the middle of the process you decide to disable that option, from that point onwards it will no longer check for whitelist.
->>>>>>> 6b6dc47... v4.11 Added Giveaway Templates and fixed a SGG / CFH bug.

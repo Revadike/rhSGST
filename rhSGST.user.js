@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.12.1
+// @version 4.13
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -26,11 +26,13 @@
 
 (function() {
     "use strict";
-    var SG, Path, Location, Hash, Features, Users, Games, APBoxes;
+    var SG, Path, Location, Hash, XSRFToken, Features, Users, Games, APBoxes;
     SG = window.location.hostname.match(/steamgifts/);
     Path = window.location.pathname;
     Location = window.location.href;
     Hash = window.location.hash;
+    XSRFToken = document.querySelector("[name='xsrf_token']");
+    XSRFToken = XSRFToken ? XSRFToken.value : "";
     Features = {
         FE: {
             Name: "Fixed Elements",
@@ -152,14 +154,17 @@
         EGF: {
             Name: "Entered Giveaways Filter"
         },
-        EGB: {
-            Name: "Enter Giveaway Button",
-            EGB_D: {
-                Name: "Display the giveaway description upon entering, if any."
-            },
-            EGB_C: {
-                Name: "Pop up the box to add a comment to the giveaway even if it doesn't have any description."
+        ELGB: {
+            Name: "Enter / Leave Giveaway Button"
+        },
+        GDCBP: {
+            Name: "Giveaway Description / Comment Box Popup",
+            GDCBP_EG: {
+                Name: "Pop up when entering a giveaway if Enter / Leave Giveaway Button is enabled."
             }
+        },
+        GWC: {
+            Name: "Giveaway Winning Chance"
         },
         GH: {
             Name: "Groups Highlighter"
@@ -374,8 +379,16 @@
             }
         } else if (GM_getValue("AGS") && SG && Path.match(/^\/($|giveaways(?!\/(wishlist|created|entered|won|new)))/)) {
             addAGSPanel();
-        } else if (GM_getValue("EGH") && Path.match(/^\/giveaway\//)) {
-            setEGHHighlighter();
+        } else if (GM_getValue("GWC") && Path.match(/^\/giveaways\/entered/)) {
+            addGWCHeading();
+        }
+        if (Path.match(/^\/giveaway\//)) {
+            if (GM_getValue("GWC")) {
+                addGWCChance();
+            }
+            if (GM_getValue("EGH")) {
+                setEGHHighlighter();
+            }
         }
         if (SG) {
             if (GM_getValue("HIR")) {
@@ -572,9 +585,13 @@
             Query: ".giveaway__column--group",
             Callback: addGGPBox
         }, {
-            Check: GM_getValue("EGB") && Path.match(/^\/($|giveaways)/),
+            Check: (GM_getValue("ELGB") || GM_getValue("GDCBP") || GM_getValue("GWC")) && Path.match(/^\/($|giveaways)/),
             Query: ".giveaway__row-inner-wrap",
-            Callback: addEGBPanel
+            Callback: addGPPanel
+        }, {
+            Check: GM_getValue("GWC") && Path.match(/^\/giveaways\/entered/),
+            Query: ".table__row-inner-wrap",
+            Callback: addGWCChance
         }, {
             Check: true,
             Query: ".giveaway__row-inner-wrap.is-faded",
@@ -826,7 +843,7 @@
         }
     }
 
-    function saveComment(XSRFToken, TradeCode, ParentID, Description, URL, DEDStatus, Callback, DEDCallback) {
+    function saveComment(TradeCode, ParentID, Description, URL, DEDStatus, Callback, DEDCallback) {
         var Data;
         Data = "xsrf_token=" + XSRFToken + "&do=" + (SG ? "comment_new" : "comment_insert") + "&trade_code=" + TradeCode + "&parent_id=" + ParentID + "&description=" +
             encodeURIComponent(Description);
@@ -2950,16 +2967,16 @@
                 setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
             } else if ((WBC.RW.checked && (User.WBC.Result == "Whitelisted") && !User.Whitelisted) || (WBC.B && WBC.RB.checked && (User.WBC.Result == "Blacklisted") && !User.Blacklisted)) {
                 getUserID(User, WBC, function() {
-                    if (WBC.XSRFToken) {
+                    if (XSRFToken) {
                         returnWBCWhitelistBlacklist(WBC, User, function() {
                             queueSave(WBC, User, function() {
                                 setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
                             });
                         });
                     } else {
-                        WBC.XSRFToken = document.querySelector("[name='xsrf_token']");
-                        if (WBC.XSRFToken) {
-                            WBC.XSRFToken = WBC.XSRFToken.value;
+                        XSRFToken = document.querySelector("[name='xsrf_token']");
+                        if (XSRFToken) {
+                            XSRFToken = XSRFToken.value;
                             returnWBCWhitelistBlacklist(WBC, User, function() {
                                 queueSave(WBC, User, function() {
                                     setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
@@ -2968,7 +2985,7 @@
                         } else {
                             queueRequest(WBC, null, "/user/" + User.Username, function(Response) {
                                 if (Response.finalUrl.match(/\/user\//)) {
-                                    WBC.XSRFToken = parseHTML(Response.responseText).querySelector("[name='xsrf_token']").value;
+                                    XSRFToken = parseHTML(Response.responseText).querySelector("[name='xsrf_token']").value;
                                     returnWBCWhitelistBlacklist(WBC, User, function() {
                                         queueSave(WBC, User, function() {
                                             setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
@@ -3005,7 +3022,7 @@
                 User[Key] = true;
                 Callback();
             } else {
-                queueRequest(WBC, "xsrf_token=" + WBC.XSRFToken + "&do=" + Type + "&child_user_id=" + User.ID + "&action=insert", "/ajax.php", function(Response) {
+                queueRequest(WBC, "xsrf_token=" + XSRFToken + "&do=" + Type + "&child_user_id=" + User.ID + "&action=insert", "/ajax.php", function(Response) {
                     if (parseJSON(Response.responseText).type == "success") {
                         User.Whitelisted = User.Blacklisted = false;
                         User[Key] = true;
@@ -4041,8 +4058,8 @@
                 queueRequest(UGS, null, UGS.Giveaways[I].URL, function(Response) {
                     var ResponseHTML, Matches, Winners, J, NumMatches, WinnersKeys;
                     ResponseHTML = parseHTML(Response.responseText);
-                    if (!UGS.XSRFToken) {
-                        UGS.XSRFToken = ResponseHTML.querySelector("[name='xsrf_token']").value;
+                    if (!XSRFToken) {
+                        XSRFToken = ResponseHTML.querySelector("[name='xsrf_token']").value;
                     }
                     Matches = ResponseHTML.getElementsByClassName("table__row-inner-wrap");
                     Winners = {};
@@ -4160,7 +4177,7 @@
 
     function sendUGSGift(UGS, Winners, Keys, I, J, N, Callback) {
         if (!UGS.Canceled) {
-            queueRequest(UGS, "xsrf_token=" + UGS.XSRFToken + "&do=sent_feedback&action=1&winner_id=" + Winners[Keys[I]], "/ajax.php", function(Response) {
+            queueRequest(UGS, "xsrf_token=" + XSRFToken + "&do=sent_feedback&action=1&winner_id=" + Winners[Keys[I]], "/ajax.php", function(Response) {
                 UGS.Checked.push(Keys[I] + UGS.Giveaways[J].Name);
                 UGS.Sent.classList.remove("rhHidden");
                 UGS.SentCount.textContent = parseInt(UGS.SentCount.textContent) + 1;
@@ -4535,22 +4552,20 @@
     // Points Refresher
 
     function setPRRefresher() {
-        var XSRFToken, Points, PR, Title, Background, Interval;
-        XSRFToken = document.querySelector("[name='xsrf_token']");
+        var Points, PR, Title, Background, Interval;
         if (XSRFToken) {
-            XSRFToken = XSRFToken.value;
             Points = document.getElementsByClassName("nav__points")[0];
             PR = {};
             Title = document.getElementsByTagName("title")[0].textContent;
             Background = GM_getValue("PR_B");
             Interval = setInterval(function() {
-                refreshPRPoints(XSRFToken, Points, PR, Title, Background);
+                refreshPRPoints(Points, PR, Title, Background);
             }, 60000);
             if (!Background) {
                 window.addEventListener("focus", function() {
-                    refreshPRPoints(XSRFToken, Points, PR, Title, Background);
+                    refreshPRPoints(Points, PR, Title, Background);
                     Interval = setInterval(function() {
-                        refreshPRPoints(XSRFToken, Points, PR, Title, Background);
+                        refreshPRPoints(Points, PR, Title, Background);
                     }, 60000);
                 });
                 window.addEventListener("blur", function() {
@@ -4560,7 +4575,7 @@
         }
     }
 
-    function refreshPRPoints(XSRFToken, Points, PR, Title, Background) {
+    function refreshPRPoints(Points, PR, Title, Background) {
         var Callback;
         Callback = function(Response) {
             var NumPoints, Matches, I, N, Context;
@@ -4568,18 +4583,7 @@
             Points.textContent = NumPoints;
             if (PR.LastPoints != NumPoints) {
                 PR.LastPoints = NumPoints;
-                Matches = document.getElementsByClassName("EGBButton");
-                for (I = 0, N = Matches.length; I < N; ++I) {
-                    if (!Matches[I].getAttribute("data-entered")) {
-                        if (parseInt(Matches[I].getAttribute("data-points")) <= NumPoints) {
-                            Matches[I].classList.remove("rhHidden");
-                            Matches[I].nextElementSibling.classList.add("rhHidden");
-                        } else {
-                            Matches[I].classList.add("rhHidden");
-                            Matches[I].nextElementSibling.classList.remove("rhHidden");
-                        }
-                    }
-                }
+                updateELGBButtons(NumPoints);
                 if (Background) {
                     if (document.hasFocus()) {
                         document.getElementsByTagName("title")[0].textContent = Title;
@@ -4653,133 +4657,205 @@
         Context.parentElement.classList.add("rhHidden");
     }
 
-    // Enter Giveaway Button
+    // Giveaway Panel
 
-    function addEGBPanel(Context) {
-        var Columns, Links, EGBPanel, EGBButton, XSRFToken, Title, URL, EntryPoints, Username, Code, Entries, Points, EGBDescription;
+    function addGPPanel(Context) {
+        var Columns, GPLinks, GP, GPPanel, Heading, Matches, Match, I, EntryPoints;
         Columns = Context.getElementsByClassName("giveaway__columns")[0];
-        Links = Context.getElementsByClassName("giveaway__links")[0];
-        Links.classList.add("EGBLinks");
-        Links.insertAdjacentHTML("afterEnd", "<div class=\"giveaway__columns EGBPanel\"></div>");
-        EGBPanel = Links.nextElementSibling;
+        GPLinks = Context.getElementsByClassName("giveaway__links")[0];
+        GPLinks.classList.add("GPLinks");
+        GPLinks.insertAdjacentHTML("afterEnd", "<div class=\"giveaway__columns GPPanel\"></div>");
+        GP = {};
+        GP.Entries = GPLinks.firstElementChild.lastElementChild;
+        GPPanel = GPLinks.nextElementSibling;
         while (!Columns.lastElementChild.classList.contains("giveaway__column--width-fill")) {
-            EGBPanel.insertBefore(Columns.lastElementChild, EGBPanel.firstElementChild);
+            GPPanel.insertBefore(Columns.lastElementChild, GPPanel.firstElementChild);
         }
-        EGBPanel.insertAdjacentHTML(
+        GPPanel.insertAdjacentHTML(
             "afterBegin",
-            "<div class=\"EGBButton\"></div>" +
-            "<a class=\"EGBDescription\" title=\"Read giveaway description.\">" +
-            "    <i class=\"fa fa-file-text\"></i>" +
-            "</a>"
-        );
-        EGBButton = EGBPanel.firstElementChild;
-        XSRFToken = document.querySelector("[name='xsrf_token']").value;
-        Title = Context.getElementsByClassName("giveaway__heading__name")[0];
-        URL = Title.getAttribute("href");
-        EntryPoints = Title.parentElement.getElementsByClassName("giveaway__heading__thin");
-        EntryPoints = parseInt(EntryPoints[EntryPoints.length - 1].textContent.match(/\d+/)[0]);
-        EGBButton.setAttribute("data-points", EntryPoints);
-        Title = Title.textContent;
-        Username = Context.getElementsByClassName("giveaway__username")[0].textContent;
-        Code = URL.match(/\/giveaway\/(.+?)\//)[1];
-        Entries = Context.getElementsByClassName("giveaway__links")[0].firstElementChild.lastElementChild;
-        Points = document.getElementsByClassName("nav__points")[0];
-        EGBDescription = EGBButton.nextElementSibling;
-        EGBButton.insertAdjacentHTML(
-            "afterEnd",
-            "<div>" +
+            "<div class=\"ELGBButton" + (GM_getValue("ELGB") ? "" : " rhHidden") + "\"></div>" +
+            "<div class=\"rhHidden\">" +
             "    <div class=\"sidebar__error is-disabled\">" +
             "        <i class=\"fa fa-exclamation-circle\"></i> " +
             "        <span>Not Enough Points</span>" +
             "    </div>" +
+            "</div>" +
+            "<a class=\"GDCBPButton" + (GM_getValue("GDCBP") ? "" : " rhHidden") + "\" title=\"Read giveaway description / add a comment to the giveaway.\">" +
+            "    <i class=\"fa fa-file-text\"></i>" +
+            "    <i class=\"fa fa-comment\"></i>" +
+            "</a>" +
+            "<div " + (GM_getValue("GWC") ? "" : "class=\"rhHidden\" ") + "title=\"Giveaway winning chance.\">" +
+            "    <i class=\"fa fa-line-chart\"></i>" +
+            "    <span class=\"GWCChance\"></span>" +
             "</div>"
         );
+        GP.ELGBButton = GPPanel.firstElementChild;
+        GP.GDCBPButton = GP.ELGBButton.nextElementSibling.nextElementSibling;
+        GP.GWCChance = GP.GDCBPButton.nextElementSibling.lastElementChild;
+        Heading = Context.getElementsByClassName("giveaway__heading__name")[0];
+        GP.Title = Heading.textContent;
+        GP.URL = Heading.getAttribute("href");
+        GP.Code = GP.URL.match(/\/giveaway\/(.+?)\//)[1];
+        Matches = Heading.parentElement.getElementsByClassName("giveaway__heading__thin");
+        Match = Matches[0].textContent.match(/\((.+) Copies\)/);
+        if (Match) {
+            GP.Copies = parseInt(Match[1]);
+            I = 1;
+        } else {
+            GP.Copies = 1;
+            I = 0;
+        }
+        EntryPoints = parseInt(Matches[I].textContent.match(/\d+/)[0]);
+        GP.ELGBButton.setAttribute("data-points", EntryPoints);
+        GP.Username = Context.getElementsByClassName("giveaway__username")[0].textContent;
+        GP.Points = document.getElementsByClassName("nav__points")[0];
         if (Context.classList.contains("is-faded")) {
             Context.classList.remove("is-faded");
             Context.classList.add("rhFaded");
-            EGBButton.setAttribute("data-entered", true);
-            EGBButton.nextElementSibling.classList.add("rhHidden");
-            setEGBButton("fa-minus-circle", "Leave", "Leaving...", "entry_delete");
+            GP.ELGBButton.setAttribute("data-entered", true);
+            setELGBButton(GP, "fa-minus-circle", "Leave", "Leaving...", "entry_delete", Context, true);
         } else {
-            if (EntryPoints <= parseInt(Points.textContent)) {
-                EGBButton.nextElementSibling.classList.add("rhHidden");
-            } else {
-                EGBButton.classList.add("rhHidden");
+            if (EntryPoints > parseInt(GP.Points.textContent)) {
+                GP.ELGBButton.classList.add("rhHidden");
+                GP.ELGBButton.nextElementSibling.classList.remove("rhHidden");
             }
-            setEGBButton("fa-plus-circle", "Enter", "Entering...", "entry_insert");
+            setELGBButton(GP, "fa-plus-circle", "Enter", "Entering...", "entry_insert", Context);
         }
-        EGBDescription.addEventListener("click", function() {
-            displayEGBDescription();
+        setGWCChance(GP.GWCChance, GP.Entries, GP.Copies);
+        GP.GDCBPButton.addEventListener("click", function() {
+            displayGDCBPPopup(GP);
         });
+    }
 
-        function setEGBButton(DefaultIcon, DefaultName, Message, Type) {
-            createButton(EGBButton, DefaultIcon, DefaultName, "fa-circle-o-notch fa-spin", Message, function(Callback) {
-                makeRequest("xsrf_token=" + XSRFToken + "&do=" + Type + "&code=" + Code, "/ajax.php", null, function(Response) {
-                    var ResponseJSON, SavedGames;
-                    ResponseJSON = parseJSON(Response.responseText);
-                    if (ResponseJSON.type == "success") {
-                        Context.classList.toggle("rhFaded");
-                        Entries.textContent = ResponseJSON.entry_count + " entries";
-                        Points.textContent = ResponseJSON.points;
-                        if (EGBButton.getAttribute("data-entered")) {
-                            EGBButton.removeAttribute("data-entered");
-                            setEGBButton("fa-plus-circle", "Enter", "Entering...", "entry_insert");
-                        } else {
-                            if (GM_getValue("EGB_D")) {
-                                displayEGBDescription();
-                            }
-                            if (GM_getValue("EGH")) {
-                                saveEGHGame(Context);
-                            }
-                            EGBButton.setAttribute("data-entered", true);
-                            setEGBButton("fa-minus-circle", "Leave", "Leaving...", "entry_delete");
-                        }
+    function setELGBButton(GP, Icon, Name, Message, Type, Context, Yellow) {
+        createButton(GP.ELGBButton, Icon, Name, "fa-circle-o-notch fa-spin", Message, function() {
+            var Data, URL;
+            Data = "xsrf_token=" + XSRFToken + "&do=" + Type + "&code=" + GP.Code;
+            URL = "/ajax.php";
+            makeRequest(Data, URL, null, function(Response) {
+                var ResponseJSON;
+                ResponseJSON = parseJSON(Response.responseText);
+                if (ResponseJSON.type == "success") {
+                    Context.classList.toggle("rhFaded");
+                    GP.Entries.textContent = ResponseJSON.entry_count + " entries";
+                    GP.Points.textContent = ResponseJSON.points;
+                    updateELGBButtons(ResponseJSON.points);
+                    setGWCChance(GP.GWCChance, GP.Entries, GP.Copies);
+                    if (GP.ELGBButton.getAttribute("data-entered")) {
+                        GP.ELGBButton.removeAttribute("data-entered");
+                        setELGBButton(GP, "fa-plus-circle", "Enter", "Entering...", "entry_insert", Context);
                     } else {
-                        Points.textContent = ResponseJSON.points;
-                        EGBButton.innerHTML =
-                            "<div class=\"sidebar__error is-disabled\">" +
-                            "    <i class=\"fa fa-exclamation-circle\"></i> " +
-                            "    <span>" + ResponseJSON.msg + "</span>" +
-                            "</div>";
-                        Callback();
+                        if (GM_getValue("GDCBP_EG")) {
+                            displayGDCBPPopup(GP);
+                        }
+                        if (GM_getValue("EGH")) {
+                            saveEGHGame(Context);
+                        }
+                        GP.ELGBButton.setAttribute("data-entered", true);
+                        setELGBButton(GP, "fa-minus-circle", "Leave", "Leaving...", "entry_delete", Context, true);
                     }
-                });
-            }, null, false, Context.classList.contains("rhFaded") ? true : false);
-        }
-
-        function displayEGBDescription() {
-            EGBDescription.innerHTML = "<i class=\"fa fa-circle-o-notch fa-spin\"></i>";
-            makeRequest(null, URL, null, function(Response) {
-                var Description, Popup;
-                EGBDescription.innerHTML = "<i class=\"fa fa-file-text\"></i>";
-                Description = parseHTML(Response.responseText).getElementsByClassName("page__description")[0];
-                if (Description || GM_getValue("EGB_C")) {
-                    Popup = createPopup(true);
-                    Popup.Popup.classList.add("EGBDescriptionPopup");
-                    Popup.Icon.classList.add("fa-file-text");
-                    Popup.Title.innerHTML = "<span><a href=\"" + URL + "\">" + Title + "</a></span> by <a href=\"/user/" + Username + "\">" + Username + "</a>";
-                    Popup.TextArea.classList.remove("rhHidden");
-                    if (GM_getValue("CFH")) {
-                        addCFHPanel(Popup.TextArea);
-                    }
-                    if (Description) {
-                        Popup.Description.insertBefore(Description, Popup.Description.firstElementChild);
-                    }
-                    createButton(Popup.Button, "fa-send", "Submit Comment", "fa-circle-o-notch fa-spin", "Saving...", function(Callback) {
-                        saveComment(XSRFToken, "", "", Popup.TextArea.value, URL, Popup.Progress, Callback, function() {
-                            makeRequest(null, URL, Popup.Progress, function(Response) {
-                                Links.firstElementChild.nextElementSibling.lastElementChild.textContent =
-                                    parseHTML(Response.responseText).getElementsByClassName("sidebar__navigation__item__count")[0].textContent + " comments";
-                                Popup.Close.click();
-                            });
-                        });
-                    });
-                    Popup.popUp(function() {
-                        Popup.TextArea.focus();
-                    });
+                } else {
+                    GP.Points.textContent = ResponseJSON.points;
+                    GP.ELGBButton.innerHTML =
+                        "<div class=\"sidebar__error is-disabled\">" +
+                        "    <i class=\"fa fa-exclamation-circle\"></i> " +
+                        "    <span>" + ResponseJSON.msg + "</span>" +
+                        "</div>";
+                    updateELGBButtons(ResponseJSON.points);
                 }
             });
+        }, null, false, Yellow);
+    }
+
+    function updateELGBButtons(Points) {
+        var Matches, I, N;
+        Matches = document.getElementsByClassName("ELGBButton");
+        for (I = 0, N = Matches.length; I < N; ++I) {
+            if (!Matches[I].getAttribute("data-entered")) {
+                if (parseInt(Matches[I].getAttribute("data-points")) <= Points) {
+                    Matches[I].classList.remove("rhHidden");
+                    Matches[I].nextElementSibling.classList.add("rhHidden");
+                } else {
+                    Matches[I].classList.add("rhHidden");
+                    Matches[I].nextElementSibling.classList.remove("rhHidden");
+                }
+            }
         }
+    }
+
+    function displayGDCBPPopup(GP) {
+        GP.GDCBPButton.innerHTML = "<i class=\"fa fa-circle-o-notch fa-spin\"></i>";
+        makeRequest(null, GP.URL, null, function(Response) {
+            var Description, Popup;
+            GP.GDCBPButton.innerHTML =
+                "<i class=\"fa fa-file-text\"></i> " +
+                "<i class=\"fa fa-comment\"></i>";
+            Description = parseHTML(Response.responseText).getElementsByClassName("page__description")[0];
+            if (Description || GM_getValue("GDCBP_EG")) {
+                Popup = createPopup(true);
+                Popup.Popup.classList.add("GDCBPPopup");
+                Popup.Icon.classList.add("fa-file-text");
+                Popup.Title.innerHTML = "<span><a href=\"" + GP.URL + "\">" + GP.Title + "</a></span> by <a href=\"/user/" + GP.Username + "\">" + GP.Username + "</a>";
+                if (Description) {
+                    Popup.Description.insertBefore(Description, Popup.Description.firstElementChild);
+                }
+                Popup.TextArea.classList.remove("rhHidden");
+                if (GM_getValue("CFH")) {
+                    addCFHPanel(Popup.TextArea);
+                }
+                createButton(Popup.Button, "fa-send", "Submit Comment", "fa-circle-o-notch fa-spin", "Saving...", function(Callback) {
+                    saveComment("", "", Popup.TextArea.value, GP.URL, Popup.Progress, Callback, function() {
+                        makeRequest(null, GP.URL, Popup.Progress, function(Response) {
+                            GP.Entries.parentElement.nextElementSibling.lastElementChild.textContent =
+                                parseHTML(Response.responseText).getElementsByClassName("sidebar__navigation__item__count")[0].textContent + " comments";
+                            Callback();
+                            Popup.Close.click();
+                        });
+                    });
+                });
+                Popup.popUp(function() {
+                    Popup.TextArea.focus();
+                });
+            }
+        });
+    }
+
+    function setGWCChance(GWCChance, Entries, Copies) {
+        var Chance;
+        Entries = parseInt(Entries.textContent.replace(",", "").match(/\d+/)[0]);
+        Chance = (Entries > 0) ? (Math.round(Copies / Entries * 10000) / 100) : 100;
+        if (Chance > 100) {
+            Chance = 100;
+        }
+        GWCChance.textContent = Chance + "% (" + Math.round(Entries / Copies) + ":1)";
+    }
+
+    function addGWCHeading() {
+        document.getElementsByClassName("table__heading")[0].firstElementChild.nextElementSibling.insertAdjacentHTML(
+            "afterEnd",
+            "<div class=\"table__column--width-small text-center\">Chance</div>"
+        );
+    }
+
+    function addGWCChance(Context) {
+        var Entered, Entries, Copies;
+        Entered = true;
+        if (!Context) {
+            Context = document;
+            Entered = false;
+        }
+        Entries = Context.getElementsByClassName(Entered ? "table__column--width-small" : "live__entry-count")[0];
+        Copies = Context.getElementsByClassName(Entered ? "table__column__heading" : "featured__heading__medium")[0].textContent.match(/\((.+) Copies\)/);
+        Copies = Copies ? Copies[1] : 1;
+        Context = Entered ? Entries : Context.getElementsByClassName("featured__column")[0];
+        Context.insertAdjacentHTML(
+            "afterEnd",
+            "<div class=\"" + (Entered ? "table__column--width-small text-center" : "featured__column") + " GWCChance\" title=\"Giveaway winning chance.\">" + (Entered ? "" : (
+                "<i class=\"fa fa-line-chart\"></i>")) +
+            "    <span></span>" +
+            "</div>"
+        );
+        setGWCChance(Context.nextElementSibling.lastElementChild, Entries, Copies);
     }
 
     // Groups Highlighter
@@ -4914,22 +4990,24 @@
                         if (Read < 0) {
                             Read = 0;
                         }
-                        if (Read < Count) {
-                            CommentsCount.insertAdjacentText("beforeEnd", " (+" + (Count - Read) + ")");
+                        if (Read <= Count) {
                             LastUnread = GM_getValue("CT_LU");
                             CommentsCount.insertAdjacentHTML(
                                 "afterEnd",
-                                " <span class=\"CTPanel\">" +
-                                "    <a class=\"CTGoToUnread\" title=\"Go to the " + (LastUnread ? "last" : "first") + " unread comment.\">" +
-                                "        <i class=\"fa fa-comments-o\"></i>" +
-                                "    </a>" +
-                                "    <a class=\"CTMarkRead\" title=\"Mark all comments as read.\">" +
-                                "        <i class=\"fa fa-eye\"></i>" +
-                                "    </a>" +
+                                " <span class=\"CTPanel\">" + ((Read < Count) ? (
+                                    "<a class=\"CTGoToUnread\" title=\"Go to the " + (LastUnread ? "last" : "first") + " unread comment.\">" +
+                                    "    <i class=\"fa fa-comments-o\"></i>" +
+                                    "</a>" +
+                                    "<a class=\"CTMarkRead\" title=\"Mark all comments as read.\">" +
+                                    "    <i class=\"fa fa-eye\"></i>" +
+                                    "</a>") : "") +
                                 "</span>"
                             );
                             CTPanel = CommentsCount.nextElementSibling;
-                            setCTPanel(CTPanel, CommentsCount.href, Key, LastUnread, Element);
+                            if (Read < Count) {
+                                CommentsCount.insertAdjacentText("beforeEnd", " (+" + (Count - Read) + ")");
+                                setCTPanel(CTPanel, CommentsCount.href, Key, LastUnread, Element);
+                            }
                             if (!Comments[Key].Visited) {
                                 CTPanel.insertAdjacentHTML(
                                     "beforeEnd",
@@ -12899,7 +12977,7 @@
     }
 
     function setMREdit(MR) {
-        var DisplayState, EditState, EditSave, XSRFToken, ID, AllowReplies, Description;
+        var DisplayState, EditState, EditSave, ID, AllowReplies, Description;
         MR.Edit = MR.Context.getElementsByClassName(SG ? "js__comment-edit" : "js_comment_edit")[0];
         if (MR.Edit) {
             MR.Edit.insertAdjacentHTML("afterEnd", "<a class=\"comment__actions__button MREdit\">Edit</a>");
@@ -13087,8 +13165,10 @@
     // Discussion Edit Detector
 
     function addDEDButton(Context, CommentURL, DEDCallback) {
-        var XSRFToken, TradeCode, ParentID, Description, URL, DEDButton, DEDStatus, ResponseHTML;
-        XSRFToken = CommentURL ? "" : document.querySelector("[name='xsrf_token']").value;
+        var TradeCode, ParentID, Description, URL, DEDButton, DEDStatus, ResponseHTML;
+        if (!XSRFToken && !CommentURL) {
+            XSRFToken = document.querySelector("[name='xsrf_token']").value;
+        }
         TradeCode = Context.querySelector("[name='trade_code']");
         TradeCode = TradeCode ? TradeCode.value : "";
         ParentID = Context.querySelector("[name='parent_id']");
@@ -13110,10 +13190,10 @@
                     ParentID = ResponseHTML.getElementById(CommentURL.match(/\/comment\/(.+)/)[1]);
                     ParentID = SG ? ParentID.closest(".comment").getAttribute("data-comment-id") : ParentID.getAttribute("data-id");
                     URL = SG ? Response.finalUrl.match(/(.+?)(#.+?)?$/)[1] : "/ajax.php";
-                    saveComment(XSRFToken, TradeCode, ParentID, Description.value, URL, DEDStatus, Callback, DEDCallback);
+                    saveComment(TradeCode, ParentID, Description.value, URL, DEDStatus, Callback, DEDCallback);
                 });
             } else {
-                saveComment(XSRFToken, TradeCode, ParentID.value, Description.value, URL, DEDStatus, Callback, DEDCallback);
+                saveComment(TradeCode, ParentID.value, Description.value, URL, DEDStatus, Callback, DEDCallback);
             }
         }, null, true);
     }
@@ -13293,7 +13373,7 @@
             ".rhBusy >*, .CFHALIPF {" +
             "    opacity: 0.2;" +
             "}" +
-            ".rhFaded .giveaway__summary >:not(.EGBPanel):not(.giveaway__columns), .rhFaded .giveaway__columns >:not(.GGPContainer), .rhFaded .global__image-outer-wrap--game-medium {" +
+            ".rhFaded .giveaway__summary >:not(.GPPanel):not(.giveaway__columns), .rhFaded .giveaway__columns >:not(.GGPContainer), .rhFaded .global__image-outer-wrap--game-medium {" +
             "    opacity: 0.5;" +
             "}" +
             ".rhPopup {" +
@@ -13453,7 +13533,7 @@
             "    width: 14px;" +
             "}" +
             ".ESPanel .pagination__navigation >*, .ESPanel .pagination_navigation >*, .ESRefresh, .ESPause, .UHButton, .PUNButton, .MTButton, .MTAll, .MTNone, .MTInverse, .WBCButton," +
-            ".NAMWCButton, .NRFButton, .GTSView, .UGSButton, .EGBDescription, .CTGoToUnread, .CTMarkRead, .CTMarkVisited, .MCBPButton, .MPPButton, .ASButton {" +
+            ".NAMWCButton, .NRFButton, .GTSView, .UGSButton, .GDCBPButton, .CTGoToUnread, .CTMarkRead, .CTMarkVisited, .MCBPButton, .MPPButton, .ASButton {" +
             "    cursor: pointer;" +
             "    display: inline-block;" +
             "}" +
@@ -13583,25 +13663,25 @@
             "    overflow: auto;" +
             "    width: 400px;" +
             "}" +
-            ".EGBLinks {" +
+            ".GPLinks {" +
             "    float: left;" +
             "    margin: 2px;" +
             "}" +
-            ".EGBPanel {" +
+            ".GPPanel {" +
             "    float: right;" +
             "    margin: 2px;" +
             "}" +
-            ".EGBButton, .EGBButton + div {" +
+            ".ELGBButton, .ELGBButton + div {" +
             "    background: none;" +
             "    border: 0;" +
             "    box-shadow: none;" +
             "    padding: 0;" +
             "}" +
-            ".EGBButton >*, .EGBButton + div >* {" +
+            ".ELGBButton >*, .ELGBButton + div >* {" +
             "    line-height: inherit;" +
             "    margin: 0;" +
             "}" +
-            ".EGBDescriptionPopup {" +
+            ".GDCBPPopup {" +
             "    overflow: auto;" +
             "    max-height: 75%;" +
             "    max-width: 75%;" +
