@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.13
+// @version 4.13.1
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -12821,8 +12821,8 @@
             }
             createButton(Popup.Button, "fa-check", "Save", "fa-circle-o-notch fa-spin", "Saving...", function(Callback) {
                 Popup.Progress.innerHTML = "";
-                saveComment(document.querySelector("[name='xsrf_token']").value, SG ? "" : document.querySelector("[name='trade_code']").value, "", Popup.TextArea.value, SG ?
-                            Location.match(/(.+?)(#.+?)?$/)[1] : "/ajax.php", Popup.Progress, Callback);
+                saveComment(SG ? "" : document.querySelector("[name='trade_code']").value, "", Popup.TextArea.value, SG ? Location.match(/(.+?)(#.+?)?$/)[1] : "/ajax.php", Popup.Progress,
+				Callback);
             });
             ESCommentBox = Context.nextElementSibling;
             if (ESCommentBox.classList.contains("ESCommentBox")) {
