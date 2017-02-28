@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.12
+// @version 4.12.1
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -396,11 +396,6 @@
         Users = {};
         Games = {};
         APBoxes = {};
-        MT = {
-            Checkboxes: {},
-            UsersSelected: [],
-            GamesSelected: []
-        };
         loadEndlessFeatures(document);
         setTimeout(goToComment, 1000);
     }

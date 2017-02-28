@@ -161,7 +161,7 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 `(steamgifts|steamtrades).com/*`
 
 ![](http://i.imgur.com/aZRQkxr.png)
-![](blob:http://imgur.com/cadb3ff3-9f94-41ab-a302-d3ce73ea712e)
+![](http://i.imgur.com/mhjTmn1.png)
 
 * Allows you to tag multiple users / games at the same time.
 * It goes without saying that this feature only works if either Permanent User Notes or Game Tags are enabled.
