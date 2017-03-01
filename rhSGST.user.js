@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.14
+// @version 4.14.1
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -166,7 +166,10 @@
         GDCBP: {
             Name: "Giveaway Description / Comment Box Popup",
             GDCBP_EG: {
-                Name: "Pop up when entering a giveaway if Enter / Leave Giveaway Button is enabled."
+                Name: "Pop up when entering a giveaway if Enter / Leave Giveaway Button is enabled.",
+                GDCBP_D: {
+                    Name: "Only pop up if the giveaway has a description."
+                }
             }
         },
         GWC: {
@@ -2955,7 +2958,15 @@
                 }
             }
             WBC.Users = sortArray(WBC.Users);
-            checkWBCUsers(WBC, 0, WBC.Users.length, Callback);
+            if (WBC.ShowResults) {
+                for (I = 0, N = WBC.Users.length; I < N; ++I) {
+                    setWBCResult(WBC, SavedUsers[getUserIndex({
+                        Username: WBC.Users[I]
+                    }, SavedUsers)], false);
+                }
+            } else {
+                checkWBCUsers(WBC, 0, WBC.Users.length, Callback);
+            }
         } else if (WBC.User && WBC.SC.checked) {
             WBC.Users.push(WBC.User.Username);
             checkWBCUsers(WBC, 0, 1, Callback);
@@ -2988,22 +2999,18 @@
                 User = (WBC.User && WBC.SC.checked) ? WBC.User : {
                     Username: WBC.Users[I]
                 };
-                if (WBC.ShowResults) {
-                    setTimeout(setWBCResult, 0, WBC, getUser(User), false, I, N, Callback);
-                } else {
-                    queueSave(WBC, User, function() {
-                        SavedUser = getUser(User);
-                        User.WBC = SavedUser.WBC;
-                        if (User.WBC && User.WBC.Result) {
-                            Result = User.WBC.Result;
-                        }
-                        User.Whitelisted = SavedUser.Whitelisted;
-                        User.Blacklisted = SavedUser.Blacklisted;
-                        checkWBCUser(WBC, User, function() {
-                            setTimeout(setWBCResult, 0, WBC, User, (Result != User.WBC.Result) ? true : false, I, N, Callback);
-                        });
+                queueSave(WBC, User, function() {
+                    SavedUser = getUser(User);
+                    User.WBC = SavedUser.WBC;
+                    if (User.WBC && User.WBC.Result) {
+                        Result = User.WBC.Result;
+                    }
+                    User.Whitelisted = SavedUser.Whitelisted;
+                    User.Blacklisted = SavedUser.Blacklisted;
+                    checkWBCUser(WBC, User, function() {
+                        setTimeout(setWBCResult, 0, WBC, User, (Result != User.WBC.Result) ? true : false, I, N, Callback);
                     });
-                }
+                });
             } else if (Callback) {
                 Callback();
             }
@@ -3017,48 +3024,48 @@
             WBC[Key].classList.remove("rhHidden");
             WBC[Key + "Count"].textContent = parseInt(WBC[Key + "Count"].textContent) + 1;
             WBC[Key + "Users"].insertAdjacentHTML("beforeEnd", "<a " + (New ? "class=\"rhBold rhItalic\" " : "") + "href=\"/user/" + User.Username + "\">" + User.Username + "</a>");
-            WBC.Popup.reposition();
-            if (WBC.ShowResults) {
-                setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
-            } else if ((WBC.RW.checked && (User.WBC.Result == "Whitelisted") && !User.Whitelisted) || (WBC.B && WBC.RB.checked && (User.WBC.Result == "Blacklisted") && !User.Blacklisted)) {
-                getUserID(User, WBC, function() {
-                    if (XSRFToken) {
-                        returnWBCWhitelistBlacklist(WBC, User, function() {
-                            queueSave(WBC, User, function() {
-                                setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
-                            });
-                        });
-                    } else {
-                        XSRFToken = document.querySelector("[name='xsrf_token']");
+            if (!WBC.ShowResults) {
+                WBC.Popup.reposition();
+                if ((WBC.RW.checked && (User.WBC.Result == "Whitelisted") && !User.Whitelisted) || (WBC.B && WBC.RB.checked && (User.WBC.Result == "Blacklisted") && !User.Blacklisted)) {
+                    getUserID(User, WBC, function() {
                         if (XSRFToken) {
-                            XSRFToken = XSRFToken.value;
                             returnWBCWhitelistBlacklist(WBC, User, function() {
                                 queueSave(WBC, User, function() {
                                     setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
                                 });
                             });
                         } else {
-                            queueRequest(WBC, null, "/user/" + User.Username, function(Response) {
-                                if (Response.finalUrl.match(/\/user\//)) {
-                                    XSRFToken = parseHTML(Response.responseText).querySelector("[name='xsrf_token']").value;
-                                    returnWBCWhitelistBlacklist(WBC, User, function() {
-                                        queueSave(WBC, User, function() {
-                                            setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
-                                        });
-                                    });
-                                } else {
+                            XSRFToken = document.querySelector("[name='xsrf_token']");
+                            if (XSRFToken) {
+                                XSRFToken = XSRFToken.value;
+                                returnWBCWhitelistBlacklist(WBC, User, function() {
                                     queueSave(WBC, User, function() {
                                         setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
                                     });
-                                }
-                            });
+                                });
+                            } else {
+                                queueRequest(WBC, null, "/user/" + User.Username, function(Response) {
+                                    if (Response.finalUrl.match(/\/user\//)) {
+                                        XSRFToken = parseHTML(Response.responseText).querySelector("[name='xsrf_token']").value;
+                                        returnWBCWhitelistBlacklist(WBC, User, function() {
+                                            queueSave(WBC, User, function() {
+                                                setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
+                                            });
+                                        });
+                                    } else {
+                                        queueSave(WBC, User, function() {
+                                            setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
+                                        });
+                                    }
+                                });
+                            }
                         }
-                    }
-                });
-            } else {
-                queueSave(WBC, User, function() {
-                    setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
-                });
+                    });
+                } else {
+                    queueSave(WBC, User, function() {
+                        setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
+                    });
+                }
             }
         }
     }
@@ -3511,7 +3518,11 @@
                 }
             }
             NAMWC.Users = sortArray(NAMWC.Users);
-            checkNAMWCUsers(NAMWC, 0, NAMWC.Users.length, Callback);
+            for (I = 0, N = NAMWC.Users.length; I < N; ++I) {
+                setNAMWCResult(NAMWC, SavedUsers[getUserIndex({
+                    Username: NAMWC.Users[I]
+                }, SavedUsers)], false);
+            }
         } else if (NAMWC.User) {
             NAMWC.Users.push(NAMWC.User.Username);
             checkNAMWCUsers(NAMWC, 0, 1, Callback);
@@ -3539,34 +3550,27 @@
                 User = NAMWC.User ? NAMWC.User : {
                     Username: NAMWC.Users[I]
                 };
-                if (NAMWC.ShowResults) {
+                queueSave(NAMWC, User, function() {
                     User.NAMWC = getUser(User).NAMWC;
                     updateNAMWCResults(User, NAMWC, function() {
-                        setTimeout(setNAMWCResult, 0, NAMWC, User, false, I, N, Callback);
-                    });
-                } else {
-                    queueSave(NAMWC, User, function() {
-                        User.NAMWC = getUser(User).NAMWC;
-                        updateNAMWCResults(User, NAMWC, function() {
-                            if (User.NAMWC && User.NAMWC.Results) {
-                                Results = User.NAMWC.Results;
-                            }
-                            checkNAMWCUser(NAMWC, User, function() {
-                                if (Results) {
-                                    for (Key in Results) {
-                                        if (Results[Key] != User.NAMWC.Results[Key]) {
-                                            New = true;
-                                            break;
-                                        }
+                        if (User.NAMWC && User.NAMWC.Results) {
+                            Results = User.NAMWC.Results;
+                        }
+                        checkNAMWCUser(NAMWC, User, function() {
+                            if (Results) {
+                                for (Key in Results) {
+                                    if (Results[Key] != User.NAMWC.Results[Key]) {
+                                        New = true;
+                                        break;
                                     }
-                                } else {
-                                    New = true;
                                 }
-                                setTimeout(setNAMWCResult, 0, NAMWC, User, New, I, N, Callback);
-                            });
+                            } else {
+                                New = true;
+                            }
+                            setTimeout(setNAMWCResult, 0, NAMWC, User, New, I, N, Callback);
                         });
                     });
-                }
+                });
             } else if (Callback) {
                 Callback();
             }
@@ -3604,10 +3608,8 @@
                     );
                 }
             }
-            NAMWC.Popup.reposition();
-            if (NAMWC.ShowResults) {
-                setTimeout(checkNAMWCUsers, 0, NAMWC, ++I, N, Callback);
-            } else {
+            if (!NAMWC.ShowResults) {
+                NAMWC.Popup.reposition();
                 queueSave(NAMWC, User, function() {
                     setTimeout(checkNAMWCUsers, 0, NAMWC, ++I, N, Callback);
                 });
@@ -4715,73 +4717,74 @@
     // Giveaway Panel
 
     function addGPPanel(Context) {
-        var Columns, GPLinks, GP, GPPanel, Heading, Matches, Match, I, EntryPoints;
+        var Columns, Heading, GP, GPLinks, GPPanel, Matches, Match, I, EntryPoints;
         Columns = Context.getElementsByClassName("giveaway__columns")[0];
         if (Columns.innerHTML.match(/remaining/)) {
-            GPLinks = Context.getElementsByClassName("giveaway__links")[0];
-            GPLinks.classList.add("GPLinks");
-            GPLinks.insertAdjacentHTML("afterEnd", "<div class=\"giveaway__columns GPPanel\"></div>");
-            GP = {};
-            GP.Entries = GPLinks.firstElementChild.lastElementChild;
-            GPPanel = GPLinks.nextElementSibling;
-            while (!Columns.lastElementChild.classList.contains("giveaway__column--width-fill")) {
-                GPPanel.insertBefore(Columns.lastElementChild, GPPanel.firstElementChild);
-            }
-            GPPanel.insertAdjacentHTML(
-                "afterBegin",
-                "<div class=\"ELGBButton" + (GM_getValue("ELGB") ? "" : " rhHidden") + "\"></div>" +
-                "<div class=\"rhHidden\">" +
-                "    <div class=\"sidebar__error is-disabled\">" +
-                "        <i class=\"fa fa-exclamation-circle\"></i> " +
-                "        <span>Not Enough Points</span>" +
-                "    </div>" +
-                "</div>" +
-                "<a class=\"GDCBPButton" + (GM_getValue("GDCBP") ? "" : " rhHidden") + "\" title=\"Read giveaway description / add a comment to the giveaway.\">" +
-                "    <i class=\"fa fa-file-text\"></i>" +
-                "    <i class=\"fa fa-comment\"></i>" +
-                "</a>" +
-                "<div " + (GM_getValue("GWC") ? "" : "class=\"rhHidden\" ") + "title=\"Giveaway winning chance.\">" +
-                "    <i class=\"fa fa-line-chart\"></i>" +
-                "    <span class=\"GWCChance\"></span>" +
-                "</div>"
-            );
-            GP.ELGBButton = GPPanel.firstElementChild;
-            GP.GDCBPButton = GP.ELGBButton.nextElementSibling.nextElementSibling;
-            GP.GWCChance = GP.GDCBPButton.nextElementSibling.lastElementChild;
             Heading = Context.getElementsByClassName("giveaway__heading__name")[0];
-            GP.Title = Heading.textContent;
+            GP = {};
             GP.URL = Heading.getAttribute("href");
-            GP.Code = GP.URL.match(/\/giveaway\/(.+?)\//)[1];
-            Matches = Heading.parentElement.getElementsByClassName("giveaway__heading__thin");
-            Match = Matches[0].textContent.match(/\((.+) Copies\)/);
-            if (Match) {
-                GP.Copies = parseInt(Match[1]);
-                I = 1;
-            } else {
-                GP.Copies = 1;
-                I = 0;
-            }
-            EntryPoints = parseInt(Matches[I].textContent.match(/\d+/)[0]);
-            GP.ELGBButton.setAttribute("data-points", EntryPoints);
-            GP.Username = Path.match(/^\/user\//) ?
-                document.getElementsByClassName("featured__heading__medium")[0].textContent : Context.getElementsByClassName("giveaway__username")[0].textContent;
-            GP.Points = document.getElementsByClassName("nav__points")[0];
-            if (Context.classList.contains("is-faded")) {
-                Context.classList.remove("is-faded");
-                Context.classList.add("rhFaded");
-                GP.ELGBButton.setAttribute("data-entered", true);
-                setELGBButton(GP, "fa-minus-circle", "Leave", "Leaving...", "entry_delete", Context, true);
-            } else {
-                if (EntryPoints > parseInt(GP.Points.textContent)) {
-                    GP.ELGBButton.classList.add("rhHidden");
-                    GP.ELGBButton.nextElementSibling.classList.remove("rhHidden");
+            if (GP.URL) {
+                GPLinks = Context.getElementsByClassName("giveaway__links")[0];
+                GPLinks.classList.add("GPLinks");
+                GPLinks.insertAdjacentHTML("afterEnd", "<div class=\"giveaway__columns GPPanel\"></div>");
+                GP.Entries = GPLinks.firstElementChild.lastElementChild;
+                GPPanel = GPLinks.nextElementSibling;
+                while (!Columns.lastElementChild.classList.contains("giveaway__column--width-fill")) {
+                    GPPanel.insertBefore(Columns.lastElementChild, GPPanel.firstElementChild);
                 }
-                setELGBButton(GP, "fa-plus-circle", "Enter", "Entering...", "entry_insert", Context);
+                GPPanel.insertAdjacentHTML(
+                    "afterBegin",
+                    "<div class=\"ELGBButton" + (GM_getValue("ELGB") ? "" : " rhHidden") + "\"></div>" +
+                    "<div class=\"rhHidden\">" +
+                    "    <div class=\"sidebar__error is-disabled\">" +
+                    "        <i class=\"fa fa-exclamation-circle\"></i> " +
+                    "        <span>Not Enough Points</span>" +
+                    "    </div>" +
+                    "</div>" +
+                    "<a class=\"GDCBPButton" + (GM_getValue("GDCBP") ? "" : " rhHidden") + "\" title=\"Read giveaway description / add a comment to the giveaway.\">" +
+                    "    <i class=\"fa fa-file-text\"></i>" +
+                    "    <i class=\"fa fa-comment\"></i>" +
+                    "</a>" +
+                    "<div " + (GM_getValue("GWC") ? "" : "class=\"rhHidden\" ") + "title=\"Giveaway winning chance.\">" +
+                    "    <i class=\"fa fa-line-chart\"></i>" +
+                    "    <span class=\"GWCChance\"></span>" +
+                    "</div>"
+                );
+                GP.ELGBButton = GPPanel.firstElementChild;
+                GP.GDCBPButton = GP.ELGBButton.nextElementSibling.nextElementSibling;
+                GP.GWCChance = GP.GDCBPButton.nextElementSibling.lastElementChild;
+                GP.Title = Heading.textContent;
+                GP.Code = GP.URL.match(/\/giveaway\/(.+?)\//)[1];
+                Matches = Heading.parentElement.getElementsByClassName("giveaway__heading__thin");
+                Match = Matches[0].textContent.match(/\((.+) Copies\)/);
+                if (Match) {
+                    GP.Copies = parseInt(Match[1]);
+                    I = 1;
+                } else {
+                    GP.Copies = 1;
+                    I = 0;
+                }
+                EntryPoints = parseInt(Matches[I].textContent.match(/\d+/)[0]);
+                GP.ELGBButton.setAttribute("data-points", EntryPoints);
+                GP.Username = Path.match(/^\/user\//) ?
+                    document.getElementsByClassName("featured__heading__medium")[0].textContent : Context.getElementsByClassName("giveaway__username")[0].textContent;
+                GP.Points = document.getElementsByClassName("nav__points")[0];
+                if (Context.classList.contains("is-faded")) {
+                    Context.classList.remove("is-faded");
+                    Context.classList.add("rhFaded");
+                    GP.ELGBButton.setAttribute("data-entered", true);
+                    setELGBButton(GP, "fa-minus-circle", "Leave", "Leaving...", "entry_delete", Context, true);
+                } else {
+                    if (EntryPoints > parseInt(GP.Points.textContent)) {
+                        GP.ELGBButton.nextElementSibling.classList.remove("rhHidden");
+                    }
+                    setELGBButton(GP, "fa-plus-circle", "Enter", "Entering...", "entry_insert", Context);
+                }
+                setGWCChance(GP.GWCChance, GP.Entries, GP.Copies);
+                GP.GDCBPButton.addEventListener("click", function() {
+                    displayGDCBPPopup(GP);
+                });
             }
-            setGWCChance(GP.GWCChance, GP.Entries, GP.Copies);
-            GP.GDCBPButton.addEventListener("click", function() {
-                displayGDCBPPopup(GP);
-            });
         }
     }
 
@@ -4809,30 +4812,32 @@
                 Context.classList.toggle("rhFaded");
                 GP.Entries.textContent = ResponseJSON.entry_count + " entries";
                 GP.Points.textContent = ResponseJSON.points;
-                updateELGBButtons(ResponseJSON.points);
                 setGWCChance(GP.GWCChance, GP.Entries, GP.Copies);
                 if (GP.ELGBButton.getAttribute("data-entered")) {
                     GP.ELGBButton.removeAttribute("data-entered");
                     setELGBButton(GP, "fa-plus-circle", "Enter", "Entering...", "entry_insert", Context);
                 } else {
                     if (GM_getValue("GDCBP") && GM_getValue("GDCBP_EG")) {
-                        displayGDCBPPopup(GP);
+                        displayGDCBPPopup(GP, true);
                     }
                     if (GM_getValue("EGH")) {
                         saveEGHGame(Context);
                     }
                     GP.ELGBButton.setAttribute("data-entered", true);
+                    GP.ELGBButton.nextElementSibling.classList.add("rhHidden");
                     setELGBButton(GP, "fa-minus-circle", "Leave", "Leaving...", "entry_delete", Context, true);
                 }
-            } else {
+            } else if (parseInt(GP.ELGBButton.getAttribute("data-points")) <= ResponseJSON.points) {
                 GP.Points.textContent = ResponseJSON.points;
                 GP.ELGBButton.innerHTML =
                     "<div class=\"sidebar__error is-disabled\">" +
                     "    <i class=\"fa fa-exclamation-circle\"></i> " +
                     "    <span>" + ResponseJSON.msg + "</span>" +
                     "</div>";
-                updateELGBButtons(ResponseJSON.points);
+            } else {
+                setELGBButton(GP, "fa-plus-circle", "Enter", "Entering...", "entry_insert", Context);
             }
+            updateELGBButtons(ResponseJSON.points);
         });
     }
 
@@ -4842,17 +4847,15 @@
         for (I = 0, N = Matches.length; I < N; ++I) {
             if (!Matches[I].getAttribute("data-entered")) {
                 if (parseInt(Matches[I].getAttribute("data-points")) <= Points) {
-                    Matches[I].classList.remove("rhHidden");
                     Matches[I].nextElementSibling.classList.add("rhHidden");
                 } else {
-                    Matches[I].classList.add("rhHidden");
                     Matches[I].nextElementSibling.classList.remove("rhHidden");
                 }
             }
         }
     }
 
-    function displayGDCBPPopup(GP) {
+    function displayGDCBPPopup(GP, Enter) {
         GP.GDCBPButton.innerHTML = "<i class=\"fa fa-circle-o-notch fa-spin\"></i>";
         makeRequest(null, GP.URL, null, function(Response) {
             var Description, Popup;
@@ -4860,7 +4863,7 @@
                 "<i class=\"fa fa-file-text\"></i> " +
                 "<i class=\"fa fa-comment\"></i>";
             Description = parseHTML(Response.responseText).getElementsByClassName("page__description")[0];
-            if (Description || GM_getValue("GDCBP_EG")) {
+            if (Description || (!Description && ((Enter && !GM_getValue("GDCBP_D")) || !Enter))) {
                 Popup = createPopup(true);
                 Popup.Popup.classList.add("GDCBPPopup");
                 Popup.Icon.classList.add("fa-file-text");
@@ -4914,7 +4917,7 @@
             Entered = false;
         }
         Entries = Context.getElementsByClassName(Entered ? "table__column--width-small" : "live__entry-count")[0];
-        Copies = Context.getElementsByClassName(Entered ? "table__column__heading" : "featured__heading__medium")[0].textContent.match(/\((.+) Copies\)/);
+        Copies = Context.getElementsByClassName(Entered ? "table__column__heading" : "featured__heading")[0].textContent.match(/\((.+) Copies\)/);
         Copies = Copies ? Copies[1] : 1;
         Context = Entered ? Entries : Context.getElementsByClassName("featured__column")[0];
         Context.insertAdjacentHTML(
