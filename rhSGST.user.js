@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.14.1
+// @version 4.14.2
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -547,7 +547,7 @@
             Name: "ESPanel",
             Callback: addESPanel
         }, {
-            Check: GM_getValue("MT") && (GM_getValue("PUT") || GM_getValue("GT")) && Object.keys(CurrentUsers).length,
+            Check: GM_getValue("MT") && (GM_getValue("PUT") || GM_getValue("GT")) && Object.keys(CurrentUsers).length && !Path.match(/^\/account/),
             Name: "MTContainer",
             Callback: addMTContainer
         }, {
@@ -1439,7 +1439,7 @@
     }
 
     function loadSMMenu(Sidebar, SMButton) {
-        var Selected, Item, SMSyncFrequency, I, Container, SMFeatures, ID, SMImport, SMExport, SMRecentUsernameChanges, SMCommentHistory, SMManageTags, SMLastSync, LastSync;
+        var Selected, Item, SMSyncFrequency, I, Container, SMFeatures, ID, SMManageData, SMRecentUsernameChanges, SMCommentHistory, SMManageTags, SMLastSync, LastSync;
         Selected = Sidebar.getElementsByClassName("is-selected")[0];
         Selected.classList.remove("is-selected");
         SMButton.classList.add("is-selected");
@@ -1459,59 +1459,10 @@
             "        <a href=\"#rhSGST\">rhSGST</a>" +
             "    </div>" +
             "</div>" +
-            "<div class=\"form__rows SMMenu\">" + createSMSections([{
+            "<div class=\"form__rows SMMenu\">" +
+            createSMSections([{
                 Title: "Features",
                 Name: "SMFeatures"
-            }, {
-                Title: "Manage Data",
-                HTML: (
-                    "<div class=\"form__submit-button SMImport\">" +
-                    "    <i class=\"fa fa-arrow-circle-up\"></i> Import" +
-                    "</div>" +
-                    "<div class=\"form__submit-button SMExport\">" +
-                    "    <i class=\"fa fa-arrow-circle-down\"></i> Export" +
-                    "</div>"
-                )
-            }, {
-                Title: "Recent Username Changes",
-                HTML: (
-                    "<div class=\"form__submit-button SMRecentUsernameChanges\">" +
-                    "    <i class=\"fa fa-user\"></i> " +
-                    "    <span>Open</span>" +
-                    "</div>"
-                )
-            }, {
-                Title: "Comment History",
-                HTML: (
-                    "<div class=\"form__submit-button SMCommentHistory\">" +
-                    "    <i class=\"fa fa-comments\"></i> " +
-                    "    <span>Open</span>" +
-                    "</div>"
-                )
-            }, {
-                Title: "Manage Tags",
-                HTML: (
-                    "<div class=\"form__submit-button SMManageTags\">" +
-                    "    <i class=\"fa fa-cog\"></i> " +
-                    "    <span>Manage</span>" +
-                    "</div>"
-                )
-            }, {
-                Title: "Manage Whitelist / Blacklist Checker Caches",
-                HTML: (
-                    "<div class=\"form__submit-button WBCButton\">" +
-                    "    <i class=\"fa fa-cog\"></i> " +
-                    "    <span>Manage</span>" +
-                    "</div>"
-                )
-            }, {
-                Title: "Manage Not Activated / Multiple Wins Checker Caches",
-                HTML: (
-                    "<div class=\"form__submit-button NAMWCButton\">" +
-                    "    <i class=\"fa fa-cog\"></i> " +
-                    "    <span>Manage</span>" +
-                    "</div>"
-                )
             }, {
                 Title: "Sync Whitelist / Blacklist",
                 HTML: SMSyncFrequency + createDescription("Select from how many days to how many days you want the automatic sync to run (0 to disable it).") + (
@@ -1528,12 +1479,42 @@
                 )
             }]) +
             "</div>";
+        createSMButtons([{
+            Check: true,
+            Icons: ["fa-arrow-circle-up", "fa-arrow-circle-down", "fa-trash"],
+            Name: "SMManageData",
+            Title: "Manage data."
+        }, {
+            Check: GM_getValue("UH"),
+            Icons: ["fa-user"],
+            Name: "SMRecentUsernameChanges",
+            Title: "See recent username changes."
+        }, {
+            Check: GM_getValue("CH"),
+            Icons: ["fa-comments"],
+            Name: "SMCommentHistory",
+            Title: "See comment history."
+        }, {
+            Check: GM_getValue("PUT"),
+            Icons: ["fa-tags", "fa-cog"],
+            Name: "SMManageTags",
+            Title: "Manage tags."
+        }, {
+            Check: GM_getValue("WBC"),
+            Icons: ["fa-heart", "fa-ban", "fa-cog"],
+            Name: "WBCButton",
+            Title: "Manage Whitelist / Blacklist Checker caches."
+        }, {
+            Check: GM_getValue("NAMWC"),
+            Icons: ["fa-trophy", "fa-cog"],
+            Name: "NAMWCButton",
+            Title: "Manage Not Activated / Multiple Wins Checker caches."
+        }]);
         SMFeatures = Container.getElementsByClassName("SMFeatures")[0];
         for (ID in Features) {
             SMFeatures.appendChild(getSMFeature(Features[ID], ID));
         }
-        SMImport = Container.getElementsByClassName("SMImport")[0];
-        SMExport = Container.getElementsByClassName("SMExport")[0];
+        SMManageData = Container.getElementsByClassName("SMManageData")[0];
         SMRecentUsernameChanges = Container.getElementsByClassName("SMRecentUsernameChanges")[0];
         SMCommentHistory = Container.getElementsByClassName("SMCommentHistory")[0];
         SMManageTags = Container.getElementsByClassName("SMManageTags")[0];
@@ -1557,189 +1538,275 @@
         SMSyncFrequency.addEventListener("change", function() {
             GM_setValue("SyncFrequency", SMSyncFrequency.selectedIndex);
         });
-        SMImport.addEventListener("click", function() {
-            var File, Reader;
-            File = document.createElement("input");
-            File.type = "file";
-            File.click();
-            File.addEventListener("change", function() {
-                File = File.files[0];
-                if (File.name.match(/\.json/)) {
-                    Reader = new FileReader();
-                    Reader.readAsText(File);
-                    Reader.onload = function() {
-                        var Key;
-                        File = parseJSON(Reader.result);
-                        if (File.rhSGST && (File.rhSGST == "Data")) {
-                            if (window.confirm("Are you sure you want to import this data? Your entire current data will be overwritten. A copy will be downloaded as precaution.")) {
-                                SMExport.click();
-                                for (Key in File.Data) {
-                                    GM_setValue(Key, File.Data[Key]);
-                                }
-                                window.alert("Imported!");
-                            }
-                        } else {
-                            window.alert("Wrong file!");
-                        }
-                    };
-                } else {
-                    window.alert("File should be in the .json format.");
-                }
-            });
-        });
-        SMExport.addEventListener("click", function() {
-            var File, Values, Data, URL, N, Key;
-            File = document.createElement("a");
-            File.download = "rhSGST.json";
-            Values = GM_listValues();
-            Data = {};
-            for (I = 0, N = Values.length; I < N; ++I) {
-                Key = Values[I];
-                Data[Key] = GM_getValue(Key);
-            }
-            Data = new Blob([JSON.stringify({
-                rhSGST: "Data",
-                Data: Data
-            })]);
-            URL = window.URL.createObjectURL(Data);
-            File.href = URL;
-            document.body.appendChild(File);
-            File.click();
-            File.remove();
-            window.URL.revokeObjectURL(URL);
-            window.alert("Exported!");
-        });
-        SMManageTags.addEventListener("click", function() {
-            var Popup, MT, SMManageTagsPopup;
+        SMManageData.addEventListener("click", function() {
+            var Popup, SM, SMImport, SMExport, SMDelete;
             Popup = createPopup(true);
             Popup.Icon.classList.add("fa-cog");
-            Popup.Title.textContent = "Manage tags:";
-            Popup.TextInput.classList.remove("rhHidden");
-            Popup.TextInput.insertAdjacentHTML("beforeBegin", "<div class=\"page__heading\"></div>");
-            MT = {};
-            addMTContainer(Popup.TextInput.previousElementSibling, MT, {
-                Popup: Popup
-            });
-            Popup.TextInput.insertAdjacentHTML(
-                "afterEnd",
-                createDescription("Filter users by tag (use commas to separate filters, for example: Filter1, Filter2, ...). Filters are not case sensitive.")
-            );
-            SMManageTagsPopup = Popup.popUp(function() {
-                var SavedUsers, MTUsers, Tags, I, N, Context, Username, SavedTags, J, NumTags, Key;
-                SavedUsers = GM_getValue("Users");
-                MTUsers = {};
-                Tags = {};
-                for (I = 0, N = SavedUsers.length; I < N; ++I) {
-                    if (SavedUsers[I].Tags) {
-                        Popup.Results.insertAdjacentHTML(
-                            "beforeEnd",
-                            "<div>" +
-                            "    <a href=\"/user/" + SavedUsers[I].Username + "\">" + SavedUsers[I].Username + "</a>" +
-                            "</div>"
-                        );
-                        Context = Popup.Results.lastElementChild.firstElementChild;
-                        Username = SavedUsers[I].Username;
-                        if (!MTUsers[Username]) {
-                            MTUsers[Username] = [];
-                        }
-                        MTUsers[Username].push(Context);
-                        SMManageTagsPopup.reposition();
-                        SavedTags = SavedUsers[I].Tags.split(/,\s/g);
-                        for (J = 0, NumTags = SavedTags.length; J < NumTags; ++J) {
-                            Key = SavedTags[J].toLowerCase();
-                            if (!Tags[Key]) {
-                                Tags[Key] = [];
-                            }
-                            Tags[Key].push(Popup.Results.children.length - 1);
-                        }
-                    }
+            Popup.Title.textContent = "Manage data:";
+            SM = {
+                Names: {
+                    Users: "U",
+                    Games: "G",
+                    Comments: "C",
+                    Comments_ST: "C_ST",
+                    Emojis: "E",
+                    Rerolls: "R",
+                    CommentHistory: "CH",
+                    StickiedGroups: "SG",
+                    Templates: "T"
                 }
-                addMTCheckboxes(MTUsers, "User", "beforeBegin", "previousElementSibling", MT);
-                loadEndlessFeatures(Popup.Results);
-                Popup.TextInput.addEventListener("input", function() {
-                    var MTUsers, Matches, Filters, Context, Username;
-                    selectMTCheckboxes(MT.UserCheckboxes, "uncheck", MT, "User");
-                    removeMTCheckboxes("User", MT);
+            };
+            createOptions(Popup.Options, SM, [{
+                Check: function() {
+                    return true;
+                },
+                Description: "Users data.",
+                Title: "Includes user notes, tags and checker caches.",
+                Name: "Users",
+                Key: "U",
+                ID: "SM_U"
+            }, {
+                Check: function() {
+                    return true;
+                },
+                Description: "Games data.",
+                Title: "Includes game tags and Entered Games Highlighter data.",
+                Name: "Games",
+                Key: "G",
+                ID: "SM_G"
+            }, {
+                Check: function() {
+                    return true;
+                },
+                Description: "Comments data (SteamGifts).",
+                Title: "Includes Comment Tracker data from SteamGifts.",
+                Name: "Comments",
+                Key: "C",
+                ID: "SM_C"
+            }, {
+                Check: function() {
+                    return true;
+                },
+                Description: "Comments data (SteamTrades).",
+                Title: "Includes Comment Tracker data from SteamTrades.",
+                Name: "Comments_ST",
+                Key: "C_ST",
+                ID: "SM_C_ST"
+            }, {
+                Check: function() {
+                    return true;
+                },
+                Description: "Emojis data.",
+                Title: "Includes Comment Formatting Helper emojis data.",
+                Name: "Emojis",
+                Key: "E",
+                ID: "SM_E"
+            }, {
+                Check: function() {
+                    return true;
+                },
+                Description: "Rerolls data.",
+                Title: "Includes Unsent Gifts Sender rerolls data.",
+                Name: "Rerolls",
+                Key: "R",
+                ID: "SM_R"
+            }, {
+                Check: function() {
+                    return true;
+                },
+                Description: "Comment history data.",
+                Title: "Includes Comment History data.",
+                Name: "CommentHistory",
+                Key: "CH",
+                ID: "SM_CH"
+            }, {
+                Check: function() {
+                    return true;
+                },
+                Description: "Stickied groups data.",
+                Title: "Includes Stickied Giveaway Groups data.",
+                Name: "StickiedGroups",
+                Key: "SG",
+                ID: "SM_SG"
+            }, {
+                Check: function() {
+                    return true;
+                },
+                Description: "Templates data.",
+                Title: "Includes Giveaway Templates data.",
+                Name: "Templates",
+                Key: "T",
+                ID: "SM_T"
+            }, {
+                Check: function() {
+                    return true;
+                },
+                Description: "Settings data.",
+                Title: "Includes feature settings.",
+                Name: "Settings",
+                Key: "S",
+                ID: "SM_S"
+            }]);
+            Popup.Button.classList.add("SMManageDataPopup");
+            Popup.Button.innerHTML =
+                "<div class=\"SMImport\"></div>" +
+                "<div class=\"SMExport\"></div>" +
+                "<div class=\"SMDelete\"></div>";
+            SMImport = Popup.Button.firstElementChild;
+            SMExport = SMImport.nextElementSibling;
+            SMDelete = SMExport.nextElementSibling;
+            createButton(SMImport, "fa-arrow-circle-up", "Import", "", "", function(Callback) {
+                Callback();
+                importSMData(SM);
+            });
+            createButton(SMExport, "fa-arrow-circle-down", "Export", "", "", function(Callback) {
+                Callback();
+                exportSMData(SM);
+            });
+            createButton(SMDelete, "fa-trash", "Delete", "", "", function(Callback) {
+                Callback();
+                deleteSMData(SM);
+            });
+            Popup.popUp();
+        });
+        if (SMManageTags) {
+            SMManageTags.addEventListener("click", function() {
+                var Popup, MT, SMManageTagsPopup;
+                Popup = createPopup(true);
+                Popup.Icon.classList.add("fa-cog");
+                Popup.Title.textContent = "Manage tags:";
+                Popup.TextInput.classList.remove("rhHidden");
+                Popup.TextInput.insertAdjacentHTML("beforeBegin", "<div class=\"page__heading\"></div>");
+                MT = {};
+                addMTContainer(Popup.TextInput.previousElementSibling, MT, {
+                    Popup: Popup
+                });
+                Popup.TextInput.insertAdjacentHTML(
+                    "afterEnd",
+                    createDescription("Filter users by tag (use commas to separate filters, for example: Filter1, Filter2, ...). Filters are not case sensitive.")
+                );
+                SMManageTagsPopup = Popup.popUp(function() {
+                    var SavedUsers, MTUsers, Tags, I, N, Context, Username, SavedTags, J, NumTags, Key;
+                    Popup.TextInput.focus();
+                    SavedUsers = GM_getValue("Users");
                     MTUsers = {};
-                    Matches = Popup.Results.getElementsByClassName("SMTag");
-                    for (I = 0, N = Matches.length; I < N; ++I) {
-                        if (Matches[I]) {
-                            Matches[I].classList.remove("SMTag");
-                        }
-                    }
-                    if (Popup.TextInput.value) {
-                        Popup.Results.classList.add("SMTags");
-                        Filters = Popup.TextInput.value.split(/,\s*/g);
-                        for (I = 0, N = Filters.length; I < N; ++I) {
-                            Key = Filters[I].toLowerCase();
-                            if (Tags[Key]) {
-                                for (J = 0, NumTags = Tags[Key].length; J < NumTags; ++J) {
-                                    Context = Popup.Results.children[Tags[Key][J]];
-                                    Context.classList.add("SMTag");
-                                    Context = Context.querySelector("a[href*='/user/']");
-                                    Username = Context.textContent;
-                                    if (!MTUsers[Username]) {
-                                        MTUsers[Username] = [];
-                                    }
-                                    MTUsers[Username].push(Context);
-                                }
-                            }
-                        }
-                    } else {
-                        Popup.Results.classList.remove("SMTags");
-                        Matches = Popup.Results.querySelectorAll("a[href*='/user/']");
-                        for (I = 0, N = Matches.length; I < N; ++I) {
-                            Context = Matches[I];
-                            Username = Context.textContent;
+                    Tags = {};
+                    for (I = 0, N = SavedUsers.length; I < N; ++I) {
+                        if (SavedUsers[I].Tags) {
+                            Popup.Results.insertAdjacentHTML(
+                                "beforeEnd",
+                                "<div>" +
+                                "    <a href=\"/user/" + SavedUsers[I].Username + "\">" + SavedUsers[I].Username + "</a>" +
+                                "</div>"
+                            );
+                            Context = Popup.Results.lastElementChild.firstElementChild;
+                            Username = SavedUsers[I].Username;
                             if (!MTUsers[Username]) {
                                 MTUsers[Username] = [];
                             }
                             MTUsers[Username].push(Context);
+                            SMManageTagsPopup.reposition();
+                            SavedTags = SavedUsers[I].Tags.split(/,\s/g);
+                            for (J = 0, NumTags = SavedTags.length; J < NumTags; ++J) {
+                                Key = SavedTags[J].toLowerCase();
+                                if (!Tags[Key]) {
+                                    Tags[Key] = [];
+                                }
+                                Tags[Key].push(Popup.Results.children.length - 1);
+                            }
                         }
                     }
                     addMTCheckboxes(MTUsers, "User", "beforeBegin", "previousElementSibling", MT);
-                    SMManageTagsPopup.reposition();
+                    loadEndlessFeatures(Popup.Results);
+                    Popup.TextInput.addEventListener("input", function() {
+                        var MTUsers, Matches, Filters, Context, Username;
+                        selectMTCheckboxes(MT.UserCheckboxes, "uncheck", MT, "User");
+                        removeMTCheckboxes("User", MT);
+                        MTUsers = {};
+                        Matches = Popup.Results.getElementsByClassName("SMTag");
+                        for (I = 0, N = Matches.length; I < N; ++I) {
+                            if (Matches[I]) {
+                                Matches[I].classList.remove("SMTag");
+                            }
+                        }
+                        if (Popup.TextInput.value) {
+                            Popup.Results.classList.add("SMTags");
+                            Filters = Popup.TextInput.value.split(/,\s*/g);
+                            for (I = 0, N = Filters.length; I < N; ++I) {
+                                Key = Filters[I].toLowerCase();
+                                if (Tags[Key]) {
+                                    for (J = 0, NumTags = Tags[Key].length; J < NumTags; ++J) {
+                                        Context = Popup.Results.children[Tags[Key][J]];
+                                        Context.classList.add("SMTag");
+                                        Context = Context.querySelector("a[href*='/user/']");
+                                        Username = Context.textContent;
+                                        if (!MTUsers[Username]) {
+                                            MTUsers[Username] = [];
+                                        }
+                                        MTUsers[Username].push(Context);
+                                    }
+                                }
+                            }
+                        } else {
+                            Popup.Results.classList.remove("SMTags");
+                            Matches = Popup.Results.querySelectorAll("a[href*='/user/']");
+                            for (I = 0, N = Matches.length; I < N; ++I) {
+                                Context = Matches[I];
+                                Username = Context.textContent;
+                                if (!MTUsers[Username]) {
+                                    MTUsers[Username] = [];
+                                }
+                                MTUsers[Username].push(Context);
+                            }
+                        }
+                        addMTCheckboxes(MTUsers, "User", "beforeBegin", "previousElementSibling", MT);
+                        SMManageTagsPopup.reposition();
+                    });
                 });
             });
-        });
-        SMRecentUsernameChanges.addEventListener("click", function() {
-            var Popup, SMRecentUsernameChangesPopup;
-            Popup = createPopup(true);
-            Popup.Results.classList.add("SMRecentUsernameChanges");
-            Popup.Icon.classList.add("fa-comments");
-            Popup.Title.textContent = "Recent Username Changes";
-            Popup.Progress.innerHTML =
-                "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
-                "<span>Loading recent username changes...</span>";
-            makeRequest(null, "https://script.google.com/macros/s/AKfycbzvOuHG913mRIXOsqHIeAuQUkLYyxTHOZim5n8iP-k80iza6g0/exec?Action=2", Popup.Progress, function(Response) {
-                var RecentChanges, HTML, N;
-                Popup.Progress.innerHTML = "";
-                RecentChanges = parseJSON(Response.responseText).RecentChanges;
-                HTML = "";
-                for (I = 0, N = RecentChanges.length; I < N; ++I) {
-                    HTML += "<div>" + RecentChanges[I][0] + " changed to <a class=\"rhBold\" href=\"/user/" + RecentChanges[I][1] + "\">" + RecentChanges[I][1] + "</a></div>";
-                }
-                Popup.Results.innerHTML = HTML;
-                loadEndlessFeatures(Popup.Results);
-                SMRecentUsernameChangesPopup.reposition();
+		}
+		if (SMRecentUsernameChanges) {
+            SMRecentUsernameChanges.addEventListener("click", function() {
+                var Popup, SMRecentUsernameChangesPopup;
+                Popup = createPopup(true);
+                Popup.Results.classList.add("SMRecentUsernameChangesPopup");
+                Popup.Icon.classList.add("fa-comments");
+                Popup.Title.textContent = "Recent Username Changes";
+                Popup.Progress.innerHTML =
+                    "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
+                    "<span>Loading recent username changes...</span>";
+                makeRequest(null, "https://script.google.com/macros/s/AKfycbzvOuHG913mRIXOsqHIeAuQUkLYyxTHOZim5n8iP-k80iza6g0/exec?Action=2", Popup.Progress, function(Response) {
+                    var RecentChanges, HTML, N;
+                    Popup.Progress.innerHTML = "";
+                    RecentChanges = parseJSON(Response.responseText).RecentChanges;
+                    HTML = "";
+                    for (I = 0, N = RecentChanges.length; I < N; ++I) {
+                        HTML += "<div>" + RecentChanges[I][0] + " changed to <a class=\"rhBold\" href=\"/user/" + RecentChanges[I][1] + "\">" + RecentChanges[I][1] + "</a></div>";
+                    }
+                    Popup.Results.innerHTML = HTML;
+                    loadEndlessFeatures(Popup.Results);
+                    SMRecentUsernameChangesPopup.reposition();
+                });
+                SMRecentUsernameChangesPopup = Popup.popUp();
             });
-            SMRecentUsernameChangesPopup = Popup.popUp();
-        });
-        SMCommentHistory.addEventListener("click", function() {
-            var Popup;
-            Popup = createPopup(true);
-            Popup.Popup.style.width = "600px";
-            Popup.Icon.classList.add("fa-comments");
-            Popup.Title.textContent = "Comment History";
-            Popup.Results.classList.add("SMComments");
-            Popup.Results.innerHTML = GM_getValue("CommentHistory");
-            loadMatchesFeatures(Popup.Results, [{
-                Check: true,
-                Query: "[data-timestamp]",
-                Callback: setATTimestamp
-            }]);
-            Popup.popUp();
-        });
+        }
+        if (SMCommentHistory) {
+            SMCommentHistory.addEventListener("click", function() {
+                var Popup;
+                Popup = createPopup(true);
+                Popup.Popup.style.width = "600px";
+                Popup.Icon.classList.add("fa-comments");
+                Popup.Title.textContent = "Comment History";
+                Popup.Results.classList.add("SMComments");
+                Popup.Results.innerHTML = GM_getValue("CommentHistory");
+                loadMatchesFeatures(Popup.Results, [{
+                    Check: true,
+                    Query: "[data-timestamp]",
+                    Callback: setATTimestamp
+                }]);
+                Popup.popUp();
+            });
+        }
     }
 
     function getSMFeature(Feature, ID) {
@@ -1787,6 +1854,124 @@
                 "</div>";
         }
         return SectionsHTML;
+    }
+
+    function createSMButtons(Items) {
+        var Heading, I, N, Item, Icons, J, NumIcons;
+        Heading = document.getElementsByClassName("page__heading")[0];
+        for (I = 0, N = Items.length; I < N; ++I) {
+            Item = Items[I];
+            if (Item.Check) {
+                Icons = "";
+                for (J = 0, NumIcons = Item.Icons.length; J < NumIcons; ++J) {
+                    Icons += "<i class=\"fa " + Item.Icons[J] + "\"></i> ";
+                }
+                Heading.insertAdjacentHTML("beforeEnd", "<a class=\"" + Item.Name + "\" title=\"" + Item.Title + "\">" + Icons + "</a>");
+            }
+        }
+    }
+
+    function importSMData(SM) {
+        var File, Reader;
+        File = document.createElement("input");
+        File.type = "file";
+        File.click();
+        File.addEventListener("change", function() {
+            File = File.files[0];
+            if (File.name.match(/\.json/)) {
+                Reader = new FileReader();
+                Reader.readAsText(File);
+                Reader.onload = function() {
+                    var Key, Setting;
+                    File = parseJSON(Reader.result);
+                    if (File.rhSGST && (File.rhSGST == "Data")) {
+                        if (window.confirm("Are you sure you want to import this data? A copy will be downloaded as precaution.")) {
+                            exportSMData(SM);
+                            for (Key in File.Data) {
+                                if (Key == "Settings") {
+                                    if (SM.S.checked) {
+                                        for (Setting in File.Data.Settings) {
+                                            GM_setValue(Setting, File.Data.Settings[Setting]);
+                                        }
+                                    }
+                                } else if (SM[SM.Names[Key]].checked) {
+                                    GM_setValue(Key, File.Data[Key]);
+                                }
+                            }
+                            window.alert("Imported!");
+                        }
+                    } else {
+                        window.alert("Wrong file!");
+                    }
+                };
+            } else {
+                window.alert("File should be in the .json format.");
+            }
+        });
+    }
+
+    function exportSMData(SM) {
+        var File, Data, Key, URL;
+        File = document.createElement("a");
+        File.download = "rhSGST.json";
+        Data = {};
+        for (Key in SM.Names) {
+            if (SM[SM.Names[Key]].checked) {
+                Data[Key] = GM_getValue(Key);
+            }
+        }
+        if (SM.S.checked) {
+            Data.Settings = {};
+            for (Key in Features) {
+                exportSMSettings(Data.Settings, Key, Features[Key]);
+            }
+        }
+        Data = new Blob([JSON.stringify({
+            rhSGST: "Data",
+            Data: Data
+        })]);
+        URL = window.URL.createObjectURL(Data);
+        File.href = URL;
+        document.body.appendChild(File);
+        File.click();
+        File.remove();
+        window.URL.revokeObjectURL(URL);
+        window.alert("Exported!");
+    }
+
+    function exportSMSettings(Data, Key, Feature) {
+        Data[Key] = GM_getValue(Key);
+        for (Key in Feature) {
+            if (Key != "Name") {
+                exportSMSettings(Data, Key, Feature[Key]);
+            }
+        }
+    }
+
+    function deleteSMData(SM) {
+        var Key;
+        if (window.confirm("Are you sure you want to delete this data? A copy will be downloaded as precaution.")) {
+            exportSMData(SM);
+            for (Key in SM.Names) {
+                if (SM[SM.Names[Key]].checked) {
+                    GM_deleteValue(Key);
+                }
+            }
+            if (SM.S.checked) {
+                for (Key in Features) {
+                    deleteSMSettings(Key, Features[Key]);
+                }
+            }
+            window.alert("Deleted!");
+        }
+    }
+
+    function deleteSMSettings(Key, Feature) {
+        for (Key in Feature) {
+            if (Key != "Name") {
+                deleteSMSettings(Key, Feature[Key]);
+            }
+        }
     }
 
     // Featured Container Hider
@@ -4733,26 +4918,26 @@
                     GPPanel.insertBefore(Columns.lastElementChild, GPPanel.firstElementChild);
                 }
                 GPPanel.insertAdjacentHTML(
-                    "afterBegin",
+                    "beforeEnd",
+                    "<div " + (GM_getValue("GWC") ? "" : "class=\"rhHidden\" ") + "title=\"Giveaway Winning Chance\">" +
+                    "    <i class=\"fa fa-line-chart\"></i>" +
+                    "    <span class=\"GWCChance\"></span>" +
+                    "</div>" +
+                    "<a class=\"GDCBPButton" + (GM_getValue("GDCBP") ? "" : " rhHidden") + "\" title=\"Read giveaway description / add a comment to the giveaway.\">" +
+                    "    <i class=\"fa fa-file-text\"></i>" +
+                    "    <i class=\"fa fa-comment\"></i>" +
+                    "</a>" +
                     "<div class=\"ELGBButton" + (GM_getValue("ELGB") ? "" : " rhHidden") + "\"></div>" +
                     "<div class=\"rhHidden\">" +
                     "    <div class=\"sidebar__error is-disabled\">" +
                     "        <i class=\"fa fa-exclamation-circle\"></i> " +
                     "        <span>Not Enough Points</span>" +
                     "    </div>" +
-                    "</div>" +
-                    "<a class=\"GDCBPButton" + (GM_getValue("GDCBP") ? "" : " rhHidden") + "\" title=\"Read giveaway description / add a comment to the giveaway.\">" +
-                    "    <i class=\"fa fa-file-text\"></i>" +
-                    "    <i class=\"fa fa-comment\"></i>" +
-                    "</a>" +
-                    "<div " + (GM_getValue("GWC") ? "" : "class=\"rhHidden\" ") + "title=\"Giveaway winning chance.\">" +
-                    "    <i class=\"fa fa-line-chart\"></i>" +
-                    "    <span class=\"GWCChance\"></span>" +
                     "</div>"
                 );
-                GP.ELGBButton = GPPanel.firstElementChild;
-                GP.GDCBPButton = GP.ELGBButton.nextElementSibling.nextElementSibling;
-                GP.GWCChance = GP.GDCBPButton.nextElementSibling.lastElementChild;
+                GP.ELGBButton = GPPanel.lastElementChild.previousElementSibling;
+                GP.GDCBPButton = GP.ELGBButton.previousElementSibling;
+                GP.GWCChance = GP.GDCBPButton.previousElementSibling.lastElementChild;
                 GP.Title = Heading.textContent;
                 GP.Code = GP.URL.match(/\/giveaway\/(.+?)\//)[1];
                 Matches = Heading.parentElement.getElementsByClassName("giveaway__heading__thin");
@@ -13540,10 +13725,10 @@
             ".SMTags >* {" +
             "    display: none;" +
             "}" +
-            ".SMTag {" +
+            ".SMManageDataPopup, .SMImport, .SMExport, .SMDelete, .SMTag {" +
             "    display: block;" +
             "}" +
-            ".SMRecentUsernameChanges a, .SMComments a {" +
+            ".SMRecentUsernameChangesPopup a, .SMComments a {" +
             "    border-bottom: 1px dotted;" +
             "}" +
             ".SMSyncFrequency {" +
@@ -13657,8 +13842,9 @@
             ".GVInfo .GPLinks, .GVInfo .GPPanel {" +
             "    float: none;" +
             "}" +
-            ".ESPanel .pagination__navigation >*, .ESPanel .pagination_navigation >*, .ESRefresh, .ESPause, .UHButton, .PUNButton, .MTButton, .MTAll, .MTNone, .MTInverse, .WBCButton," +
-            ".NAMWCButton, .NRFButton, .GTSView, .UGSButton, .GDCBPButton, .CTGoToUnread, .CTMarkRead, .CTMarkVisited, .MCBPButton, .MPPButton, .ASButton {" +
+            ".SMManageData, .SMRecentUsernameChanges, .SMCommentHistory, .SMManageTags, .ESPanel .pagination__navigation >*, .ESPanel .pagination_navigation >*, .ESRefresh, .ESPause," +
+            ".UHButton, .PUNButton, .MTButton, .MTAll, .MTNone, .MTInverse, .WBCButton, .NAMWCButton, .NRFButton, .GTSView, .UGSButton, .GDCBPButton, .CTGoToUnread, .CTMarkRead," +
+            ".CTMarkVisited, .MCBPButton, .MPPButton, .ASButton {" +
             "    cursor: pointer;" +
             "    display: inline-block;" +
             "}" +
@@ -13799,6 +13985,12 @@
             ".GPPanel {" +
             "    float: right;" +
             "    margin: 2px;" +
+            "}" +
+            ".GPPanel >:first-child {" +
+            "    margin: 0;" +
+            "}" +
+            ".GPPanel >*:not(:first-child) {" +
+            "    margin: 0 0 0 5px;" +
             "}" +
             ".ELGBButton, .ELGBButton + div {" +
             "    background: none;" +
