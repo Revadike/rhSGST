@@ -22,8 +22,10 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 ## Features
 
 * [Settings Menu](#settings-menu)
+* [Featured Container Hider](#featured-container-hider)
 * [Fixed Elements](#fixed-elements)
 * [Endless Scrolling](#endless-scrolling)
+* [Grid View](#grid-view)
 * [SteamGifts Profile Button](#steamgifts-profile-button)
 * [SteamTrades Profile Button](#steamtrades-profile-button)
 * [Comment History](#comment-history)
@@ -45,7 +47,9 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 * [Points Refresher](#points-refresher)
 * [Entered Games Highlighter](#entered-games-highlighter)
 * [Entered Giveaways Filter](#entered-giveaways-filter)
-* [Enter Giveaway Button](#enter-giveaway-button)
+* [Enter / Leave Giveaway Button](#enter--leave-giveaway-button)
+* [Giveaway Description / Comment Box Popup](#giveaway-description--comment-box-popup)
+* [Giveaway Winning Chance](#giveaway-winning-chance)
 * [Giveaway Groups Popout](#giveaway-groups-popout)
 * [Discussions Highlighter](#discussions-highlighter)
 * [Comment Tracker](#comment-tracker)
@@ -71,6 +75,14 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 * Allows you to manage `Whitelist / Blacklist Highlighter` and `Not Activated / Multiple Wins Checker` caches.
 * Allows you to sync your data and enable / disable the automatic sync.
 
+### Featured Container Hider
+
+`steamgifts.com/giveaways/*`
+
+![](http://i.imgur.com/QjTxvo2.png)
+
+* Hides the featured container in the giveaways pages.
+
 ### Fixed Elements
 
 `(steamgifts|steamtrades).com/*`
@@ -93,6 +105,12 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 * You can refresh pages without leaving the page.
 * You can pause / resume the endless scrolling.
 * You can enable reverse scrolling for discussions.
+
+### Grid View
+
+`steamgifts.com/giveaways*`
+
+![](http://i.imgur.com/jhd1m4A.png)
 
 ### SteamGifts Profile Button
 
@@ -303,20 +321,26 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 
 ### Enter / Leave Giveaway Button
 
-`steamgifts.com/giveaways/*`
+`steamgifts.com/(giveaways|user|group)/*`
+
+![](http://i.imgur.com/dR5gyHW.png)
 
 * Allows you to enter / leave giveaways directly from the giveaways pages.
 
 ### Giveaway Description / Comment Box Popup
 
-`steamgifts.com/giveaways/*`
+`steamgifts.com/(giveaways|user|group)/*`
+
+![](http://i.imgur.com/6HJTICj.png)
 
 * Allows you to view giveaway descriptions and add comments to giveaways directly from the giveaways pages.
 * You can enable an option to show it automatically upon entering a giveaway if Enter / Leave Giveaway Button is enabled.
 
 ### Giveaway Winning Chance
 
-`steamgifts.com/(giveaways|giveaways/entered|giveaway)/*`
+`steamgifts.com/(giveaways|giveaways/entered|giveaway|user|group)/*`
+
+![](http://i.imgur.com/Pib5Tom.png)
 
 * Displays your winning chance for a giveaway.
 

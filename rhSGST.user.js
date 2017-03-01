@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.13.1
+// @version 4.14
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -34,6 +34,9 @@
     XSRFToken = document.querySelector("[name='xsrf_token']");
     XSRFToken = XSRFToken ? XSRFToken.value : "";
     Features = {
+        FCH: {
+            Name: "Featured Container Hider"
+        },
         FE: {
             Name: "Fixed Elements",
             FE_H: {
@@ -72,6 +75,9 @@
             ES_RS: {
                 Name: "Disable reverse scrolling."
             }
+        },
+        GV: {
+            Name: "Grid View"
         },
         SGPB: {
             Name: "SteamGifts Profile Button"
@@ -363,6 +369,9 @@
 
     function loadFeatures() {
         var CommentBox;
+        if (GM_getValue("FCH") && Path.match(/^\/($|giveaways(?!\/(wishlist|created|entered|won|new)))/)) {
+            hideFCHContainer();
+        }
         if (GM_getValue("FE")) {
             fixFEElements();
         }
@@ -576,6 +585,10 @@
             Query: ".giveaway__row-inner-wrap.is-faded",
             Callback: hideEGFGiveaway
         }, {
+            Check: GM_getValue("GV") && Path.match(/^\/($|giveaways)/),
+            Query: ".giveaway__row-outer-wrap",
+            Callback: setGVContainer
+        }, {
             Check: GM_getValue("GH") && !Path.match(/^\/account/),
             Query: ".table__column__heading[href*='/group/']",
             Callback: highlightGHGroups,
@@ -585,7 +598,7 @@
             Query: ".giveaway__column--group",
             Callback: addGGPBox
         }, {
-            Check: (GM_getValue("ELGB") || GM_getValue("GDCBP") || GM_getValue("GWC")) && Path.match(/^\/($|giveaways)/),
+            Check: (GM_getValue("ELGB") || GM_getValue("GDCBP") || GM_getValue("GWC")) && Path.match(/^\/($|giveaways|(user|group)\/)/),
             Query: ".giveaway__row-inner-wrap",
             Callback: addGPPanel
         }, {
@@ -1773,6 +1786,12 @@
         return SectionsHTML;
     }
 
+    // Featured Container Hider
+
+    function hideFCHContainer() {
+        document.getElementsByClassName("featured__container")[0].classList.add("rhHidden");
+    }
+
     // Fixed Elements
 
     function fixFEElements() {
@@ -2176,6 +2195,42 @@
                 });
             });
         }
+    }
+
+    // GV - Grid View
+
+    function setGVContainer(Context) {
+        var GVBox, GVInfo, Columns, GVIcons, Element;
+        Context.parentElement.classList.add("GVView");
+        Context.classList.add("GVContainer");
+        GVBox = Context.getElementsByClassName("giveaway__row-inner-wrap")[0];
+        GVBox.classList.add("GVBox");
+        GVBox.insertAdjacentHTML("afterBegin", "<div class=\"global__image-outer-wrap GVInfo rhHidden\"></div>");
+        GVInfo = GVBox.firstElementChild;
+        do {
+            Element = GVInfo.nextElementSibling;
+            if (Element) {
+                GVInfo.appendChild(Element);
+            }
+        } while (Element);
+        GVBox.insertBefore(Context.getElementsByClassName("global__image-outer-wrap--game-medium")[0], GVInfo);
+        Columns = Context.getElementsByClassName("giveaway__columns")[0];
+        Context.insertAdjacentHTML("afterBegin", "<div class=\"GVIcons giveaway__columns\"></div>");
+        GVIcons = Context.firstElementChild;
+        while (!Columns.lastElementChild.classList.contains("giveaway__column--width-fill")) {
+            Element = Columns.lastElementChild;
+            if (Element.textContent.match(/Level/)) {
+                Element.textContent = Element.textContent.replace(/Level\s/, "");
+            }
+            GVIcons.appendChild(Element);
+        }
+        GVBox.addEventListener("mouseenter", function() {
+            GVInfo.classList.remove("rhHidden");
+            repositionPopout(GVInfo, GVBox);
+        });
+        GVBox.addEventListener("mouseleave", function() {
+            GVInfo.classList.add("rhHidden");
+        });
     }
 
     // SGPB - SteamGifts Profile Button
@@ -4662,109 +4717,123 @@
     function addGPPanel(Context) {
         var Columns, GPLinks, GP, GPPanel, Heading, Matches, Match, I, EntryPoints;
         Columns = Context.getElementsByClassName("giveaway__columns")[0];
-        GPLinks = Context.getElementsByClassName("giveaway__links")[0];
-        GPLinks.classList.add("GPLinks");
-        GPLinks.insertAdjacentHTML("afterEnd", "<div class=\"giveaway__columns GPPanel\"></div>");
-        GP = {};
-        GP.Entries = GPLinks.firstElementChild.lastElementChild;
-        GPPanel = GPLinks.nextElementSibling;
-        while (!Columns.lastElementChild.classList.contains("giveaway__column--width-fill")) {
-            GPPanel.insertBefore(Columns.lastElementChild, GPPanel.firstElementChild);
-        }
-        GPPanel.insertAdjacentHTML(
-            "afterBegin",
-            "<div class=\"ELGBButton" + (GM_getValue("ELGB") ? "" : " rhHidden") + "\"></div>" +
-            "<div class=\"rhHidden\">" +
-            "    <div class=\"sidebar__error is-disabled\">" +
-            "        <i class=\"fa fa-exclamation-circle\"></i> " +
-            "        <span>Not Enough Points</span>" +
-            "    </div>" +
-            "</div>" +
-            "<a class=\"GDCBPButton" + (GM_getValue("GDCBP") ? "" : " rhHidden") + "\" title=\"Read giveaway description / add a comment to the giveaway.\">" +
-            "    <i class=\"fa fa-file-text\"></i>" +
-            "    <i class=\"fa fa-comment\"></i>" +
-            "</a>" +
-            "<div " + (GM_getValue("GWC") ? "" : "class=\"rhHidden\" ") + "title=\"Giveaway winning chance.\">" +
-            "    <i class=\"fa fa-line-chart\"></i>" +
-            "    <span class=\"GWCChance\"></span>" +
-            "</div>"
-        );
-        GP.ELGBButton = GPPanel.firstElementChild;
-        GP.GDCBPButton = GP.ELGBButton.nextElementSibling.nextElementSibling;
-        GP.GWCChance = GP.GDCBPButton.nextElementSibling.lastElementChild;
-        Heading = Context.getElementsByClassName("giveaway__heading__name")[0];
-        GP.Title = Heading.textContent;
-        GP.URL = Heading.getAttribute("href");
-        GP.Code = GP.URL.match(/\/giveaway\/(.+?)\//)[1];
-        Matches = Heading.parentElement.getElementsByClassName("giveaway__heading__thin");
-        Match = Matches[0].textContent.match(/\((.+) Copies\)/);
-        if (Match) {
-            GP.Copies = parseInt(Match[1]);
-            I = 1;
-        } else {
-            GP.Copies = 1;
-            I = 0;
-        }
-        EntryPoints = parseInt(Matches[I].textContent.match(/\d+/)[0]);
-        GP.ELGBButton.setAttribute("data-points", EntryPoints);
-        GP.Username = Context.getElementsByClassName("giveaway__username")[0].textContent;
-        GP.Points = document.getElementsByClassName("nav__points")[0];
-        if (Context.classList.contains("is-faded")) {
-            Context.classList.remove("is-faded");
-            Context.classList.add("rhFaded");
-            GP.ELGBButton.setAttribute("data-entered", true);
-            setELGBButton(GP, "fa-minus-circle", "Leave", "Leaving...", "entry_delete", Context, true);
-        } else {
-            if (EntryPoints > parseInt(GP.Points.textContent)) {
-                GP.ELGBButton.classList.add("rhHidden");
-                GP.ELGBButton.nextElementSibling.classList.remove("rhHidden");
+        if (Columns.innerHTML.match(/remaining/)) {
+            GPLinks = Context.getElementsByClassName("giveaway__links")[0];
+            GPLinks.classList.add("GPLinks");
+            GPLinks.insertAdjacentHTML("afterEnd", "<div class=\"giveaway__columns GPPanel\"></div>");
+            GP = {};
+            GP.Entries = GPLinks.firstElementChild.lastElementChild;
+            GPPanel = GPLinks.nextElementSibling;
+            while (!Columns.lastElementChild.classList.contains("giveaway__column--width-fill")) {
+                GPPanel.insertBefore(Columns.lastElementChild, GPPanel.firstElementChild);
             }
-            setELGBButton(GP, "fa-plus-circle", "Enter", "Entering...", "entry_insert", Context);
+            GPPanel.insertAdjacentHTML(
+                "afterBegin",
+                "<div class=\"ELGBButton" + (GM_getValue("ELGB") ? "" : " rhHidden") + "\"></div>" +
+                "<div class=\"rhHidden\">" +
+                "    <div class=\"sidebar__error is-disabled\">" +
+                "        <i class=\"fa fa-exclamation-circle\"></i> " +
+                "        <span>Not Enough Points</span>" +
+                "    </div>" +
+                "</div>" +
+                "<a class=\"GDCBPButton" + (GM_getValue("GDCBP") ? "" : " rhHidden") + "\" title=\"Read giveaway description / add a comment to the giveaway.\">" +
+                "    <i class=\"fa fa-file-text\"></i>" +
+                "    <i class=\"fa fa-comment\"></i>" +
+                "</a>" +
+                "<div " + (GM_getValue("GWC") ? "" : "class=\"rhHidden\" ") + "title=\"Giveaway winning chance.\">" +
+                "    <i class=\"fa fa-line-chart\"></i>" +
+                "    <span class=\"GWCChance\"></span>" +
+                "</div>"
+            );
+            GP.ELGBButton = GPPanel.firstElementChild;
+            GP.GDCBPButton = GP.ELGBButton.nextElementSibling.nextElementSibling;
+            GP.GWCChance = GP.GDCBPButton.nextElementSibling.lastElementChild;
+            Heading = Context.getElementsByClassName("giveaway__heading__name")[0];
+            GP.Title = Heading.textContent;
+            GP.URL = Heading.getAttribute("href");
+            GP.Code = GP.URL.match(/\/giveaway\/(.+?)\//)[1];
+            Matches = Heading.parentElement.getElementsByClassName("giveaway__heading__thin");
+            Match = Matches[0].textContent.match(/\((.+) Copies\)/);
+            if (Match) {
+                GP.Copies = parseInt(Match[1]);
+                I = 1;
+            } else {
+                GP.Copies = 1;
+                I = 0;
+            }
+            EntryPoints = parseInt(Matches[I].textContent.match(/\d+/)[0]);
+            GP.ELGBButton.setAttribute("data-points", EntryPoints);
+            GP.Username = Path.match(/^\/user\//) ?
+                document.getElementsByClassName("featured__heading__medium")[0].textContent : Context.getElementsByClassName("giveaway__username")[0].textContent;
+            GP.Points = document.getElementsByClassName("nav__points")[0];
+            if (Context.classList.contains("is-faded")) {
+                Context.classList.remove("is-faded");
+                Context.classList.add("rhFaded");
+                GP.ELGBButton.setAttribute("data-entered", true);
+                setELGBButton(GP, "fa-minus-circle", "Leave", "Leaving...", "entry_delete", Context, true);
+            } else {
+                if (EntryPoints > parseInt(GP.Points.textContent)) {
+                    GP.ELGBButton.classList.add("rhHidden");
+                    GP.ELGBButton.nextElementSibling.classList.remove("rhHidden");
+                }
+                setELGBButton(GP, "fa-plus-circle", "Enter", "Entering...", "entry_insert", Context);
+            }
+            setGWCChance(GP.GWCChance, GP.Entries, GP.Copies);
+            GP.GDCBPButton.addEventListener("click", function() {
+                displayGDCBPPopup(GP);
+            });
         }
-        setGWCChance(GP.GWCChance, GP.Entries, GP.Copies);
-        GP.GDCBPButton.addEventListener("click", function() {
-            displayGDCBPPopup(GP);
-        });
     }
 
     function setELGBButton(GP, Icon, Name, Message, Type, Context, Yellow) {
         createButton(GP.ELGBButton, Icon, Name, "fa-circle-o-notch fa-spin", Message, function() {
-            var Data, URL;
-            Data = "xsrf_token=" + XSRFToken + "&do=" + Type + "&code=" + GP.Code;
-            URL = "/ajax.php";
-            makeRequest(Data, URL, null, function(Response) {
-                var ResponseJSON;
-                ResponseJSON = parseJSON(Response.responseText);
-                if (ResponseJSON.type == "success") {
-                    Context.classList.toggle("rhFaded");
-                    GP.Entries.textContent = ResponseJSON.entry_count + " entries";
-                    GP.Points.textContent = ResponseJSON.points;
-                    updateELGBButtons(ResponseJSON.points);
-                    setGWCChance(GP.GWCChance, GP.Entries, GP.Copies);
-                    if (GP.ELGBButton.getAttribute("data-entered")) {
-                        GP.ELGBButton.removeAttribute("data-entered");
-                        setELGBButton(GP, "fa-plus-circle", "Enter", "Entering...", "entry_insert", Context);
-                    } else {
-                        if (GM_getValue("GDCBP_EG")) {
-                            displayGDCBPPopup(GP);
-                        }
-                        if (GM_getValue("EGH")) {
-                            saveEGHGame(Context);
-                        }
-                        GP.ELGBButton.setAttribute("data-entered", true);
-                        setELGBButton(GP, "fa-minus-circle", "Leave", "Leaving...", "entry_delete", Context, true);
-                    }
-                } else {
-                    GP.Points.textContent = ResponseJSON.points;
-                    GP.ELGBButton.innerHTML =
-                        "<div class=\"sidebar__error is-disabled\">" +
-                        "    <i class=\"fa fa-exclamation-circle\"></i> " +
-                        "    <span>" + ResponseJSON.msg + "</span>" +
-                        "</div>";
-                    updateELGBButtons(ResponseJSON.points);
-                }
-            });
+            if (XSRFToken) {
+                enterLeaveELGBGiveaway(GP, Icon, Name, Message, Type, Context, Yellow);
+            } else {
+                makeRequest("", "/", null, function(Response) {
+                    XSRFToken = parseHTML(Response.responseText).querySelector("[name='xsrf_token']").value;
+                    enterLeaveELGBGiveaway(GP, Icon, Name, Message, Type, Context, Yellow);
+                });
+            }
         }, null, false, Yellow);
+    }
+
+    function enterLeaveELGBGiveaway(GP, Icon, Name, Message, Type, Context, Yellow) {
+        var Data, URL;
+        Data = "xsrf_token=" + XSRFToken + "&do=" + Type + "&code=" + GP.Code;
+        URL = "/ajax.php";
+        makeRequest(Data, URL, null, function(Response) {
+            var ResponseJSON;
+            ResponseJSON = parseJSON(Response.responseText);
+            if (ResponseJSON.type == "success") {
+                Context.classList.toggle("rhFaded");
+                GP.Entries.textContent = ResponseJSON.entry_count + " entries";
+                GP.Points.textContent = ResponseJSON.points;
+                updateELGBButtons(ResponseJSON.points);
+                setGWCChance(GP.GWCChance, GP.Entries, GP.Copies);
+                if (GP.ELGBButton.getAttribute("data-entered")) {
+                    GP.ELGBButton.removeAttribute("data-entered");
+                    setELGBButton(GP, "fa-plus-circle", "Enter", "Entering...", "entry_insert", Context);
+                } else {
+                    if (GM_getValue("GDCBP") && GM_getValue("GDCBP_EG")) {
+                        displayGDCBPPopup(GP);
+                    }
+                    if (GM_getValue("EGH")) {
+                        saveEGHGame(Context);
+                    }
+                    GP.ELGBButton.setAttribute("data-entered", true);
+                    setELGBButton(GP, "fa-minus-circle", "Leave", "Leaving...", "entry_delete", Context, true);
+                }
+            } else {
+                GP.Points.textContent = ResponseJSON.points;
+                GP.ELGBButton.innerHTML =
+                    "<div class=\"sidebar__error is-disabled\">" +
+                    "    <i class=\"fa fa-exclamation-circle\"></i> " +
+                    "    <span>" + ResponseJSON.msg + "</span>" +
+                    "</div>";
+                updateELGBButtons(ResponseJSON.points);
+            }
+        });
     }
 
     function updateELGBButtons(Points) {
@@ -12822,7 +12891,7 @@
             createButton(Popup.Button, "fa-check", "Save", "fa-circle-o-notch fa-spin", "Saving...", function(Callback) {
                 Popup.Progress.innerHTML = "";
                 saveComment(SG ? "" : document.querySelector("[name='trade_code']").value, "", Popup.TextArea.value, SG ? Location.match(/(.+?)(#.+?)?$/)[1] : "/ajax.php", Popup.Progress,
-				Callback);
+                            Callback);
             });
             ESCommentBox = Context.nextElementSibling;
             if (ESCommentBox.classList.contains("ESCommentBox")) {
@@ -13438,7 +13507,8 @@
             "}" +
             ".rhPopout {" +
             "    align-self: baseline;" +
-            "    border: 1px solid #ccc;" +
+            "    background-color: #fff;" +
+            "    border: 1px solid #d2d6e0;" +
             "    border-radius: 5px;" +
             "    font-size: 12px;" +
             "    padding: 5px !important;" +
@@ -13528,14 +13598,70 @@
             "    margin: 5px 0;" +
             "    text-align: center;" +
             "}" +
-            ".SGPBButton i, .SGPBButton img {" +
-            "    height: 14px;" +
-            "    width: 14px;" +
+            ".GVView {" +
+            "    text-align: center;" +
+            "}" +
+            ".GVContainer {" +
+            "    border: 0 !important;" +
+            "    box-shadow: none !important;" +
+            "    display: inline-block;" +
+            "    margin: 5px;" +
+            "    padding: 0;" +
+            "}" +
+            ".GVContainer .giveaway__columns:not(.GPPanel) {" +
+            "    display: block;" +
+            "}" +
+            ".GVContainer .giveaway__columns:not(.GPPanel) >:first-child {" +
+            "    margin: 0;" +
+            "}" +
+            ".GVIcons {" +
+            "    position: absolute;" +
+            "    width: 25px;" +
+            "}" +
+            ".GVIcons >:not(.GGPContainer) {" +
+            "    text-align: center;" +
+            "}" +
+            ".GVIcons >* {" +
+            "    border-radius: 2px;" +
+            "    display: block;" +
+            "    line-height: normal;" +
+            "    padding: 2px;" +
+            "    margin: 0 !important;" +
+            "}" +
+            ".GVIcons .GGPButton {" +
+            "    padding: 0;" +
+            "}" +
+            ".GVBox {" +
+            "    display: block;" +
+            "    margin: 0 0 0 25px;" +
+            "}" +
+            ".GVBox >:first-child {" +
+            "    margin: 0 !important;" +
+            "}" +
+            ".GVInfo {" +
+            "    align-items: center;" +
+            "    display: flex;" +
+            "    position: absolute;" +
+            "    text-align: left;" +
+            "    z-index: 1;" +
+            "}" +
+            ".GVInfo >:last-child {" +
+            "    margin: -35px 0 0 5px;" +
+            "}" +
+            ".GVInfo .text-right {" +
+            "    text-align: left;" +
+            "}" +
+            ".GVInfo .GPLinks, .GVInfo .GPPanel {" +
+            "    float: none;" +
             "}" +
             ".ESPanel .pagination__navigation >*, .ESPanel .pagination_navigation >*, .ESRefresh, .ESPause, .UHButton, .PUNButton, .MTButton, .MTAll, .MTNone, .MTInverse, .WBCButton," +
             ".NAMWCButton, .NRFButton, .GTSView, .UGSButton, .GDCBPButton, .CTGoToUnread, .CTMarkRead, .CTMarkVisited, .MCBPButton, .MPPButton, .ASButton {" +
             "    cursor: pointer;" +
             "    display: inline-block;" +
+            "}" +
+            ".SGPBButton i, .SGPBButton img {" +
+            "    height: 14px;" +
+            "    width: 14px;" +
             "}" +
             ".UHBox {" +
             "    background-position: center;" +
