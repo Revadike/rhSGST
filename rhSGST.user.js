@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.15
+// @version 4.15.1
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -381,7 +381,7 @@
 		var Popup;
 		if (!GM_getValue("GSync")) {
 			Popup = createPopup(true);
-			Popup.Icon.classList.add("fa-refresh fa-spin");
+			Popup.Icon.classList.add("fa-refresh", "fa-spin");
 			Popup.Title.textContent = "rhSGST is updating your groups. Please wait...";
 			syncGroups(Popup, "/account/steam/groups/search?page=", 1, [], function(Groups) {
 				GM_setValue("GSync", true);
