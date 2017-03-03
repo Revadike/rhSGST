@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.14.2
+// @version 4.15
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -36,6 +36,9 @@
     Features = {
         FCH: {
             Name: "Featured Container Hider"
+        },
+        BSH: {
+            Name: "Blacklist Stats Hider"
         },
         FE: {
             Name: "Fixed Elements",
@@ -85,6 +88,9 @@
         STPB: {
             Name: "SteamTrades Profile Button"
         },
+		SGC: {
+			Name: "Shared Groups Checker"
+		},
         CH: {
             Name: "Comment History"
         },
@@ -302,6 +308,7 @@
         };
     }
     setDefaultValues();
+	updateGroups();
     addStyles();
     loadFeatures();
     if (SG) {
@@ -319,7 +326,7 @@
 
     // Helper Functions
 
-    function setDefaultValues() {
+	function setDefaultValues() {
         var DefaultValues, rhSGST, Key;
         DefaultValues = {
             Avatar: "",
@@ -370,10 +377,27 @@
         }
     }
 
+	function updateGroups() {
+		var Popup;
+		if (!GM_getValue("GSync")) {
+			Popup = createPopup(true);
+			Popup.Icon.classList.add("fa-refresh fa-spin");
+			Popup.Title.textContent = "rhSGST is updating your groups. Please wait...";
+			syncGroups(Popup, "/account/steam/groups/search?page=", 1, [], function(Groups) {
+				GM_setValue("GSync", true);
+				GM_setValue("Groups", Groups);
+				Popup.Title.textContent = "Done. You can close this now.";
+			});
+			Popup.popUp();
+		}
+	}
+
     function loadFeatures() {
         var CommentBox;
         if (GM_getValue("FCH") && Path.match(/^\/($|giveaways(?!\/(wishlist|created|entered|won|new)))/)) {
             hideFCHContainer();
+        } else if (GM_getValue("BSH") && Path.match(/^\/stats\/personal\/community/)) {
+            hideBSHStats();
         }
         if (GM_getValue("FE")) {
             fixFEElements();
@@ -455,6 +479,9 @@
         if (GM_getValue("PUN")) {
             addPUNButton(Heading, Username, ID, SteamID64);
         }
+		if (GM_getValue("SGC")) {
+			addSGCContainer(Context, SteamID64);
+		}
     }
 
     function loadEndlessFeatures(Context) {
@@ -582,7 +609,7 @@
         loadMatchesFeatures(Context, [{
             Check: GM_getValue("AP"),
             Query: ".global__image-outer-wrap--avatar-small",
-            Callback: addAPBox
+            Callback: addAPContainer
         }, {
             Check: GM_getValue("EGF") && Path.match(/^\/($|giveaways)/),
             Query: ".giveaway__row-inner-wrap.is-faded",
@@ -995,7 +1022,10 @@
                 ResponseHTML = parseHTML(Response.responseText);
                 Matches = ResponseHTML.getElementsByClassName("table__column__heading");
                 for (I = 0, N = Matches.length; I < N; ++I) {
-                    Groups.push(Matches[I].getAttribute("href").match(/group\/(.+)\//)[1]);
+                    Groups.push({
+                        Code: Matches[I].getAttribute("href").match(/group\/(.+)\//)[1],
+                        Name: Matches[I].textContent
+                    });
                 }
                 Pagination = ResponseHTML.getElementsByClassName("pagination__navigation")[0];
                 if (Pagination && !Pagination.lastElementChild.classList.contains("is-selected")) {
@@ -1189,28 +1219,30 @@
         return Popup;
     }
 
+    // Popout
+
     function createPopout(Context) {
         var Popout;
         Context.insertAdjacentHTML("beforeEnd", "<div class=\"page__outer-wrap page_outer_wrap rhPopout rhHidden\"></div>");
         Popout = {
             Popout: Context.lastElementChild,
-            CustomRule: function(Target) {
+            customRule: function() {
                 return true;
             },
             popOut: function(Context, Callback) {
                 if (Callback) {
                     Callback(Popout.Popout);
                 }
-                Popout.Popout.classList.remove("rhHidden");
-                Popout.Popout.removeAttribute("style");
-                repositionPopout(Popout.Popout, Context);
+                Popout.reposition(Context);
             },
             reposition: function(Context) {
+                Popout.Popout.classList.remove("rhHidden");
+                Popout.Popout.removeAttribute("style");
                 repositionPopout(Popout.Popout, Context);
             }
         };
         document.addEventListener("click", function(Event) {
-            if (!Popout.Popout.classList.contains("rhHidden") && document.body.contains(Event.target) && !Popout.Popout.parentElement.contains(Event.target) && Popout.CustomRule(Event.target)) {
+            if (!Popout.Popout.classList.contains("rhHidden") && document.body.contains(Event.target) && !Popout.Popout.contains(Event.target) && Popout.customRule(Event.target)) {
                 Popout.Popout.classList.add("rhHidden");
             }
         });
@@ -1218,14 +1250,23 @@
     }
 
     function repositionPopout(Popout, Context) {
-        var Width, Height;
-        Width = Popout.offsetWidth;
-        Height = Popout.offsetHeight;
-        if ((Popout.offsetLeft + Width) > window.innerWidth) {
-            Popout.style.marginLeft = "-" + (Width - Context.offsetWidth) + "px";
-        }
-        if ((Popout.offsetTop + Height + 44) > (window.scrollY + window.innerHeight)) {
-            Popout.style.marginTop = "-" + (Height + Context.offsetHeight) + "px";
+        var PopoutRect, PopoutLeft, PopoutWidth, PopoutTop, PopoutHeight, ContextRect, ContextLeft, ContextWidth, ContextTop, ContextHeight;
+        PopoutRect = Popout.getBoundingClientRect();
+        PopoutLeft = PopoutRect.left;
+        PopoutWidth = PopoutRect.width;
+        PopoutTop = PopoutRect.top;
+        PopoutHeight = PopoutRect.height;
+        ContextRect = Context.getBoundingClientRect();
+        ContextLeft = ContextRect.left;
+        ContextWidth = ContextRect.width;
+        ContextTop = ContextRect.top;
+        ContextHeight = ContextRect.height;
+        Popout.style.marginLeft = ((PopoutLeft + PopoutWidth) > document.documentElement.clientWidth) ?
+            (-(PopoutWidth - ContextWidth - (ContextLeft - PopoutLeft)) + "px") : ((ContextLeft - PopoutLeft) + "px");
+        if ((PopoutHeight + ContextTop + ContextHeight + 44) > document.documentElement.clientHeight) {
+            Popout.style.marginTop = (PopoutTop > ContextTop) ? (-(PopoutHeight + (PopoutTop - ContextTop)) + "px") : (-(PopoutHeight - (ContextTop - PopoutTop)) + "px");
+        } else {
+            Popout.style.marginTop = (PopoutTop > ContextTop) ? (((ContextTop - PopoutTop) + ContextHeight) + "px") : (-((PopoutTop - ContextTop) - ContextHeight) + "px");
         }
     }
 
@@ -1764,8 +1805,8 @@
                     });
                 });
             });
-		}
-		if (SMRecentUsernameChanges) {
+        }
+        if (SMRecentUsernameChanges) {
             SMRecentUsernameChanges.addEventListener("click", function() {
                 var Popup, SMRecentUsernameChangesPopup;
                 Popup = createPopup(true);
@@ -1978,6 +2019,27 @@
 
     function hideFCHContainer() {
         document.getElementsByClassName("featured__container")[0].classList.add("rhHidden");
+    }
+
+    // Blacklist Stats Hider
+
+    function hideBSHStats() {
+        var Context, Interval;
+        Context = document.getElementsByClassName("chart")[4];
+        Context = Context.firstElementChild;
+        Context.lastElementChild.remove();
+        Context.lastElementChild.remove();
+        Context = Context.nextElementSibling;
+        Context.textContent = Context.textContent.replace(/and blacklists\s/, "");
+        Context = Context.nextElementSibling;
+        Interval = setInterval(function() {
+            var Chart;
+            Chart = Context.getElementsByClassName("highcharts-series highcharts-series-1")[0];
+            if (Chart) {
+                clearInterval(Interval);
+                Chart.remove();
+            }
+        }, 0);
     }
 
     // Fixed Elements
@@ -2274,7 +2336,7 @@
                 return Context.getElementsByClassName("table__rows")[0];
             } else if (GM_getValue("ES_DC") && Path.match(/^\/(discussion|support\/ticket)\//)) {
                 return Context.getElementsByClassName("comments")[1];
-            } else if (GM_getValue("ES_R") && Path.match(/^\/(messages|user\/)/)) {
+            } else if (GM_getValue("ES_R") && Path.match(/^\/(messages|user\/|group\/)/)) {
                 return Context.getElementsByClassName("page__heading")[0].nextElementSibling;
             } else if (Path.match(/^\/giveaway\//)) {
                 if (Path.match(GM_getValue("ES_R") && /\/(entries|winners)/)) {
@@ -2414,6 +2476,7 @@
         }
         GVBox.addEventListener("mouseenter", function() {
             GVInfo.classList.remove("rhHidden");
+            GVInfo.removeAttribute("style");
             repositionPopout(GVInfo, GVBox);
         });
         GVBox.addEventListener("mouseleave", function() {
@@ -2465,6 +2528,84 @@
                 setSiblingsOpacity(STPBButton, "1");
             });
         }
+    }
+
+    // SGC - Shared Groups Checker
+
+    function addSGCContainer(Context, SteamID64) {
+        var SGCContainer, SGCButton, SGCBox;
+        Context = Context.getElementsByClassName("sidebar__shortcut-inner-wrap")[0];
+        Context.insertAdjacentHTML(
+            "beforeEnd",
+            "<div class=\"SGCContainer\">" +
+            "    <a class=\"SGCButton\">" +
+            "        <i class=\"fa fa-fw fa-users\"></i>" +
+            "    </a>" +
+            "</div>"
+        );
+        SGCContainer = Context.lastElementChild;
+        SGCButton = SGCContainer.firstElementChild;
+        Context = document.getElementsByClassName("js-tooltip")[0];
+        if (Context) {
+            SGCContainer.addEventListener("mouseenter", function() {
+                Context.textContent = "Check Shared Groups";
+                setSiblingsOpacity(SGCContainer, "0.5");
+            });
+            SGCContainer.addEventListener("mouseleave", function() {
+                setSiblingsOpacity(SGCContainer, "1");
+            });
+        }
+        SGCContainer.addEventListener("click", function() {
+            if (SGCBox) {
+                SGCBox.popOut(SGCContainer);
+            } else {
+                SGCBox = createPopout(SGCContainer);
+                SGCBox.Popout.classList.add("SGCBox");
+                SGCBox.Popout.innerHTML =
+                    "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
+                    "<span>Checking shared groups...</span>";
+                SGCBox.customRule = function(Target) {
+                    return !SGCContainer.contains(Target);
+                };
+                SGCBox.popOut(SGCContainer);
+                makeRequest(null, "http://www.steamcommunity.com/profiles/" + SteamID64 + "/groups", SGCBox.Popout, function(Response) {
+                    var ResponseHTML, Matches, Groups, I, NumMatches, Name, J, NumGroups, Avatar;
+                    SGCBox.Popout.innerHTML = "<div class=\"giveaway__heading__name\">Shared Groups</div>";
+                    ResponseHTML = parseHTML(Response.responseText);
+                    Matches = ResponseHTML.getElementsByClassName("linkTitle");
+                    Groups = GM_getValue("Groups");
+                    for (I = 0, NumMatches = Matches.length; I < NumMatches; ++I) {
+                        Name = Matches[I].textContent;
+                        for (J = 0, NumGroups = Groups.length; (J < NumGroups) && (Groups[J].Name != Name); ++J);
+                        if (J < NumGroups) {
+                            Avatar = Matches[I].parentElement.previousElementSibling.firstElementChild.firstElementChild.firstElementChild.getAttribute("src");
+                            SGCBox.Popout.insertAdjacentHTML(
+                                "beforeEnd",
+                                "<div class=\"table__row-outer-wrap\">" +
+                                "    <div class=\"table__row-inner-wrap\">" +
+                                "        <div>" +
+                                "            <span>" +
+                                "                <a class=\"global__image-outer-wrap global__image-outer-wrap--avatar-small\" href=\"/group/" + Groups[J].Code + "/\">" +
+                                "                    <div class=\"global__image-inner-wrap\" style=\"background-image:url(" + Avatar + ");\"></div>" +
+                                "                </a>" +
+                                "            </span>" +
+                                "        </div>" +
+                                "        <div class=\"table__column--width-fill\">" +
+                                "            <a class=\"table__column__heading\" href=\"/group/" + Groups[J].Code + "/\">" + Groups[J].Name + "</a>" +
+                                "        </div>" +
+                                "    </div>" +
+                                "</div>"
+                            );
+                        }
+                    }
+                    if (SGCBox.Popout.children.length == 1) {
+                        SGCBox.Popout.insertAdjacentHTML("beforeEnd", "<div>No shared groups found.</div>");
+                    }
+                    loadEndlessFeatures(SGCBox.Popout);
+                    SGCBox.reposition(SGCContainer);
+                });
+            }
+        });
     }
 
     // UH - Username History
@@ -2661,10 +2802,10 @@
         MTContainer = Context.firstElementChild;
         MTButton = MTContainer.firstElementChild;
         MTBox = createPopout(MTContainer);
-        MTBox.CustomRule = function(Target) {
-            return (!Target.closest(".MTUserCheckbox") && !Target.closest(".MTGameCheckbox"));
-        };
         MTBox.Popout.classList.add("MTBox");
+        MTBox.customRule = function(Target) {
+            return (!MTContainer.contains(Target) && !Target.closest(".MTUserCheckbox") && !Target.closest(".MTGameCheckbox"));
+        };
         Context = SM ? SM.Popup.Options : MTBox.Popout;
         Context.innerHTML =
             "<div" + ((GM_getValue("PUT") && !SM) ? "" : " class=\"rhHidden\"") + "><span class=\"MTUsers\"></span> Enable selection for user tags.</div>" +
@@ -2804,7 +2945,11 @@
         MT.Progress = Popup.Progress;
         MT.OverallProgress = Popup.OverallProgress;
         MTButton.addEventListener("click", function() {
-            MTBox.popOut(MTButton);
+            if (MTBox.Popout.classList.contains("rhHidden")) {
+                MTBox.popOut(MTContainer);
+            } else {
+                MTBox.Popout.classList.add("rhHidden");
+            }
         });
     }
 
@@ -3367,7 +3512,7 @@
                             getWBCGiveaways(WBC, User, NextPage, CurrentPage, URL, Callback);
                         } else if ((User.WBC.GroupGiveaways && User.WBC.GroupGiveaways.length) || WBC.GroupGiveaways.length) {
                             getWBCGroupGiveaways(WBC, 0, WBC.GroupGiveaways.length, User, function(Result) {
-                                var Groups, GroupGiveaways, Found;
+                                var Groups, GroupGiveaways, Found, J, NumGroups;
                                 if (Result) {
                                     Callback();
                                 } else {
@@ -3376,7 +3521,8 @@
                                         Found = false;
                                         GroupGiveaways = User.WBC.GroupGiveaways[GroupGiveaway];
                                         for (I = 0, N = GroupGiveaways.length; (I < N) && !Found; ++I) {
-                                            if (Groups.indexOf(GroupGiveaways[I]) >= 0) {
+                                            for (J = 0, NumGroups = Groups.length; (J < NumGroups) && (Groups[J].Code != GroupGiveaways[I]); ++J);
+                                            if (J < NumGroups) {
                                                 Found = true;
                                             }
                                         }
@@ -4090,51 +4236,66 @@
         }
     }
 
-    // Avatar Popout
+    // AP - Avatar Popout
 
-    function addAPBox(Context) {
-        var APAvatar, URL, Match, Key, ID, APBox;
-        APAvatar = Context;
+    function addAPContainer(APAvatar) {
+        var URL, Match, Key, ID, APContainer, Context;
         URL = APAvatar.getAttribute("href");
         Match = URL ? URL.match(/\/(user|group)\/(.+)/) : null;
         if (Match) {
+            Key = Match[1];
+            ID = Match[2];
             APAvatar.classList.add("APAvatar");
             APAvatar.removeAttribute("href");
-            APAvatar.insertAdjacentHTML("afterEnd", "<span>" + APAvatar.outerHTML + "</span>");
-            Context = APAvatar.nextElementSibling;
-            APAvatar.remove();
-            APAvatar = Context.firstElementChild;
-            ID = Match[2];
-            Key = Match[1];
-            Context.addEventListener("click", function() {
+            APAvatar.insertAdjacentHTML("afterEnd", "<span class=\"APContainer\"></span>");
+            APContainer = APAvatar.nextElementSibling;
+            APContainer.appendChild(APAvatar);
+            Context = APContainer.closest(".SGCBox") || APContainer.closest(".GGPBox");
+            if (Context) {
+                Context.insertAdjacentHTML("afterEnd", "<div></div>");
+                Context = Context.nextElementSibling;
+            } else {
+                Context = APContainer;
+            }
+            APAvatar.addEventListener("click", function() {
+                var APBox;
                 APBox = APBoxes[ID];
                 if (APBox) {
-                    Context.appendChild(APBox.Popout);
-                    APBox.Popout.removeAttribute("style");
-                    APBox.popOut(APAvatar);
+                    if (APBox.Popout.classList.contains("rhHidden")) {
+                        Context.appendChild(APBox.Popout);
+                        APBox.customRule = function(Target) {
+                            return (!APContainer.contains(Target) && !Context.contains(Target));
+                        };
+                        APBox.popOut(APAvatar);
+                    } else {
+                        APBox.Popout.classList.add("rhHidden");
+                    }
                 } else {
                     APBoxes[ID] = APBox = createPopout(Context);
                     APBox.Popout.classList.add("APBox");
                     APBox.Popout.innerHTML =
                         "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
-                        "<span>Loading " + ((Key == "user") ? "profile" : "group") + "...</span>";
+                        "<span>Loading " + Key + "...</span>";
+                    APBox.customRule = function(Target) {
+                        return (!APContainer.contains(Target) && !Context.contains(Target));
+                    };
                     APBox.popOut(APAvatar);
                     makeRequest(null, URL, APBox.Popout, function(Response) {
-                        var ResponseHTML, Avatar, APLink, Columns, I, N, ReportButton;
+                        var ResponseHTML, Avatar, Columns, ReportButton, APLink, I, N;
                         ResponseHTML = parseHTML(Response.responseText);
                         APBox.Popout.innerHTML =
                             ResponseHTML.getElementsByClassName("featured__outer-wrap")[0].outerHTML +
                             "<div class=\"sidebar__shortcut-outer-wrap\">" + ResponseHTML.getElementsByClassName("sidebar__shortcut-inner-wrap")[0].outerHTML + "</div>";
                         Avatar = APBox.Popout.getElementsByClassName("global__image-outer-wrap--avatar-large")[0];
+                        Columns = APBox.Popout.getElementsByClassName("featured__table__column");
+                        ReportButton = APBox.Popout.getElementsByClassName("js__submit-form-inner")[0];
                         Avatar.insertAdjacentHTML("afterEnd", "<a class=\"APLink\"></a>");
                         APLink = Avatar.nextElementSibling;
                         APLink.appendChild(Avatar);
                         APLink.setAttribute("href", URL);
-                        Columns = APBox.Popout.getElementsByClassName("featured__table__column");
                         for (I = 0, N = Columns[1].children.length; I < N; ++I) {
                             Columns[0].appendChild(Columns[1].firstElementChild);
                         }
-                        ReportButton = APBox.Popout.getElementsByClassName("js__submit-form-inner")[0];
                         if (ReportButton) {
                             ReportButton.addEventListener("click", function() {
                                 return ReportButton.getElementsByTagName("form")[0].submit();
@@ -4457,6 +4618,9 @@
         GTSContainer = Context.firstElementChild;
         GTSView = GTSContainer.firstElementChild;
         Popout = createPopout(GTSContainer);
+        Popout.customRule = function(Target) {
+            return !GTSContainer.contains(Target);
+        };
         Templates = GM_getValue("Templates");
         N = Templates.length;
         if (N) {
@@ -4473,7 +4637,11 @@
             Popout.Popout.textContent = "No templates saved.";
         }
         GTSView.addEventListener("click", function() {
-            Popout.popOut(GTSContainer);
+            if (Popout.Popout.classList.contains("rhHidden")) {
+                Popout.popOut(GTSContainer);
+            } else {
+                Popout.Popout.classList.add("rhHidden");
+            }
         });
     }
 
@@ -4954,16 +5122,18 @@
                 GP.Username = Path.match(/^\/user\//) ?
                     document.getElementsByClassName("featured__heading__medium")[0].textContent : Context.getElementsByClassName("giveaway__username")[0].textContent;
                 GP.Points = document.getElementsByClassName("nav__points")[0];
-                if (Context.classList.contains("is-faded")) {
-                    Context.classList.remove("is-faded");
-                    Context.classList.add("rhFaded");
-                    GP.ELGBButton.setAttribute("data-entered", true);
-                    setELGBButton(GP, "fa-minus-circle", "Leave", "Leaving...", "entry_delete", Context, true);
-                } else {
-                    if (EntryPoints > parseInt(GP.Points.textContent)) {
-                        GP.ELGBButton.nextElementSibling.classList.remove("rhHidden");
+                if (GM_getValue("ELGB")) {
+                    if (Context.classList.contains("is-faded")) {
+                        Context.classList.remove("is-faded");
+                        Context.classList.add("rhFaded");
+                        GP.ELGBButton.setAttribute("data-entered", true);
+                        setELGBButton(GP, "fa-minus-circle", "Leave", "Leaving...", "entry_delete", Context, true);
+                    } else {
+                        if (EntryPoints > parseInt(GP.Points.textContent)) {
+                            GP.ELGBButton.nextElementSibling.classList.remove("rhHidden");
+                        }
+                        setELGBButton(GP, "fa-plus-circle", "Enter", "Entering...", "entry_insert", Context);
                     }
-                    setELGBButton(GP, "fa-plus-circle", "Enter", "Entering...", "entry_insert", Context);
                 }
                 setGWCChance(GP.GWCChance, GP.Entries, GP.Copies);
                 GP.GDCBPButton.addEventListener("click", function() {
@@ -5118,11 +5288,12 @@
     // Groups Highlighter
 
     function highlightGHGroups(Matches) {
-        var I, N, SavedGroups, Group;
-        SavedGroups = GM_getValue("Groups");
+        var I, N, Groups, Group, J, NumGroups;
+        Groups = GM_getValue("Groups");
         for (I = 0, N = Matches.length; I < N; ++I) {
             Group = Matches[I].getAttribute("href").match(/\/group\/(.+)\//)[1];
-            if (SavedGroups.indexOf(Group) >= 0) {
+            for (J = 0, NumGroups = Groups.length; (J < NumGroups) && (Groups[J].Code != Group); ++J);
+            if (J < NumGroups) {
                 Matches[I].closest(".table__row-outer-wrap").classList.add("GHHighlight");
             }
         }
@@ -5140,26 +5311,29 @@
         Context = GGPButton.nextElementSibling;
         GGPButton.remove();
         GGPButton = Context.firstElementChild;
+        GGPBox = createPopout(Context);
+        GGPBox.Popout.classList.add("GGPBox");
+        GGPBox.customRule = function(Target) {
+            return !GGPButton.contains(Target);
+        };
         GGPButton.addEventListener("click", function() {
-            if (GGPBox) {
-                GGPBox.Popout.innerHTML = "";
+            if (GGPBox.Popout.classList.contains("rhHidden")) {
+                GGPBox.Popout.innerHTML =
+                    "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
+                    "<span>Loading giveaway groups...</span>";
+                GGPBox.popOut(GGPButton);
+                getGGPGroups(URL + "/search?page=", 1, GGPBox.Popout, [], function(Groups) {
+                    var I, N;
+                    GGPBox.Popout.innerHTML = "<a class=\"giveaway__heading__name\" href=\"" + URL + "\">Groups</a>";
+                    for (I = 0, N = Groups.length; I < N; ++I) {
+                        GGPBox.Popout.appendChild(Groups[I]);
+                    }
+                    loadEndlessFeatures(GGPBox.Popout);
+                    GGPBox.reposition(GGPButton);
+                });
             } else {
-                GGPBox = createPopout(Context);
-                GGPBox.Popout.classList.add("GGPBox");
+                GGPBox.Popout.classList.add("rhHidden");
             }
-            GGPBox.Popout.innerHTML =
-                "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
-                "<span>Loading giveaway groups...</span>";
-            GGPBox.popOut(GGPButton);
-            getGGPGroups(URL + "/search?page=", 1, GGPBox.Popout, [], function(Groups) {
-                var I, N;
-                GGPBox.Popout.innerHTML = "<a class=\"giveaway__heading__name\" href=\"" + URL + "\">Groups</a>";
-                for (I = 0, N = Groups.length; I < N; ++I) {
-                    GGPBox.Popout.appendChild(Groups[I]);
-                }
-                loadEndlessFeatures(GGPBox.Popout);
-                GGPBox.reposition(GGPButton);
-            });
         });
     }
 
@@ -5183,23 +5357,26 @@
     // Discussions Highlighter
 
     function highlightDHDiscussions(Matches) {
-        var Comments, I, N, Key, Container;
+        var Comments, I, N, Match, Key, Container;
         Comments = GM_getValue("Comments");
         for (I = 0, N = Matches.length; I < N; ++I) {
-            Key = Matches[I].getElementsByClassName("table__column__heading")[0].getAttribute("href").match(/\/discussion\/(.+?)\//)[1];
-            if (!Comments[Key]) {
-                Comments[Key] = {
-                    Highlighted: false
-                };
+            Match = Matches[I].getElementsByClassName("table__column__heading")[0].getAttribute("href").match(/\/discussion\/(.+?)\//);
+            if (Match) {
+                Key = Match[1];
+                if (!Comments[Key]) {
+                    Comments[Key] = {
+                        Highlighted: false
+                    };
+                }
+                Container = Matches[I].getElementsByClassName("table__column--width-fill")[0].firstElementChild;
+                if (Comments[Key].Highlighted) {
+                    Matches[I].classList.add("DHHighlight");
+                    Container.insertAdjacentHTML("afterBegin", "<i class=\"fa fa-star DHIcon\" title=\"Unhighlight discussion.\"></i>");
+                } else {
+                    Container.insertAdjacentHTML("afterBegin", "<i class=\"fa fa-star-o DHIcon\" title=\"Highlight discussion.\"></i>");
+                }
+                setDHIcon(Container.firstElementChild, Matches[I], Key);
             }
-            Container = Matches[I].getElementsByClassName("table__column--width-fill")[0].firstElementChild;
-            if (Comments[Key].Highlighted) {
-                Matches[I].classList.add("DHHighlight");
-                Container.insertAdjacentHTML("afterBegin", "<i class=\"fa fa-star DHIcon\" title=\"Unhighlight discussion.\"></i>");
-            } else {
-                Container.insertAdjacentHTML("afterBegin", "<i class=\"fa fa-star-o DHIcon\" title=\"Highlight discussion.\"></i>");
-            }
-            setDHIcon(Container.firstElementChild, Matches[I], Key);
         }
         GM_setValue("Comments", Comments);
     }
@@ -12994,7 +13171,7 @@
     }
 
     function addCFHItem(Item, CFH) {
-        var Context, Popout;
+        var Context, Button, Popout;
         if ((Item.ID && GM_getValue(Item.ID)) || !Item.ID) {
             CFH.Panel.insertAdjacentHTML(
                 "beforeEnd",
@@ -13007,11 +13184,20 @@
                 "</span>"
             );
             Context = CFH.Panel.lastElementChild;
+            Button = Context.firstElementChild;
             if (Item.setPopout) {
                 Popout = createPopout(Context);
+                Popout.Popout.classList.add("CFHPopout");
+                Popout.customRule = function(Target) {
+                    return !Button.contains(Target);
+                };
                 Item.setPopout(Popout.Popout);
-                Context.addEventListener("click", function() {
-                    Popout.popOut(Context, Item.Callback);
+                Button.addEventListener("click", function() {
+                    if (Popout.Popout.classList.contains("rhHidden")) {
+                        Popout.popOut(Button, Item.Callback);
+                    } else {
+                        Popout.Popout.classList.add("rhHidden");
+                    }
                 });
             } else {
                 if (Item.Callback) {
@@ -13137,7 +13323,7 @@
                     MR.TradeCode = "";
                 } else {
                     if (!Path.match(/^\/messages/)) {
-                        MR.TradeCode = Path.match(/^\/trade\/(.+)\//)[1];
+                        MR.TradeCode = Path.match(/^\/trade\/(.+?)\//)[1];
                     }
                     MR.Username = MR.Comment.getElementsByClassName("author_name")[0].textContent;
                 }
@@ -13443,7 +13629,7 @@
                 makeRequest(null, CommentURL, DEDStatus, function(Response) {
                     ResponseHTML = parseHTML(Response.responseText);
                     XSRFToken = ResponseHTML.querySelector("[name='xsrf_token']").value;
-                    TradeCode = SG ? "" : Response.finalUrl.match(/\/trade\/(.+)\//)[1];
+                    TradeCode = SG ? "" : Response.finalUrl.match(/\/trade\/(.+?)\//)[1];
                     ParentID = ResponseHTML.getElementById(CommentURL.match(/\/comment\/(.+)/)[1]);
                     ParentID = SG ? ParentID.closest(".comment").getAttribute("data-comment-id") : ParentID.getAttribute("data-id");
                     URL = SG ? Response.finalUrl.match(/(.+?)(#.+?)?$/)[1] : "/ajax.php";
@@ -13698,11 +13884,14 @@
             "    background-color: #fff;" +
             "    border: 1px solid #d2d6e0;" +
             "    border-radius: 5px;" +
+            "    cursor: initial;" +
             "    font-size: 12px;" +
+            "    line-height: normal;" +
             "    padding: 5px !important;" +
             "    position: absolute;" +
+            "    text-align: left;" +
             "    text-shadow: none;" +
-            "    width: 375px;" +
+            "    white-space: nowrap;" +
             "    z-index: 997;" +
             "}" +
             ".rhCheckbox, .APAvatar, .APLink, .APLink >* {" +
@@ -13852,6 +14041,10 @@
             "    height: 14px;" +
             "    width: 14px;" +
             "}" +
+            ".SGCBox, .GGPBox {" +
+            "    max-height: 200px;" +
+            "    overflow: auto;" +
+            "}" +
             ".UHBox {" +
             "    background-position: center;" +
             "    margin: 5px 0 0;" +
@@ -13908,6 +14101,7 @@
             ".APBox .featured__outer-wrap {" +
             "    padding: 5px;" +
             "    width: 365px;" +
+            "    white-space: normal;" +
             "}" +
             ".APBox .featured__inner-wrap, .MPPPostDefault {" +
             "    padding: 0;" +
@@ -13970,13 +14164,6 @@
             ".GGPButton {" +
             "    cursor: pointer;" +
             "    padding: 0 8px;" +
-            "}" +
-            ".GGPBox {" +
-            "    line-height: normal;" +
-            "    max-height: 300px;" +
-            "    opacity: 1 !important;" +
-            "    overflow: auto;" +
-            "    width: 400px;" +
             "}" +
             ".GPLinks {" +
             "    float: left;" +
@@ -14074,6 +14261,10 @@
             "}" +
             ".CFHPanel ~ textarea {" +
             "    max-height: 475px;" +
+            "}" +
+            ".CFHPopout {" +
+            "    white-space: normal;" +
+            "    width: 300px;" +
             "}" +
             ".MPPPostOpen {" +
             "    display: none;" +

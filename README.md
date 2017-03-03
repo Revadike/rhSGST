@@ -83,6 +83,14 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 
 * Hides the featured container in the giveaways pages.
 
+### Blacklist Stats Hider
+
+`steamgifts.com/stats/personal/community`
+
+![](http://i.imgur.com/yB3pQSI.png)
+
+* Hides blacklist stats in the stats page.
+
 ### Fixed Elements
 
 `(steamgifts|steamtrades).com/*`
@@ -127,6 +135,14 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 ![](http://i.imgur.com/iJxVz6D.png)
 
 * Adds a button that links to an user's SteamTrades profile.
+
+### Shared Groups Checker
+
+`steamgifts.com\/*`
+
+![](http://i.imgur.com/5NkCrum.png)
+
+* Allows you to check which groups you and another user have in common.
 
 ### Comment History
 
