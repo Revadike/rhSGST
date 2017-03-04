@@ -22,50 +22,72 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 ## Features
 
 * [Settings Menu](#settings-menu)
-* [Featured Container Hider](#featured-container-hider)
-* [Blacklist Stats Hider](#blacklist-stats-hider)
+
+## General
+
 * [Fixed Elements](#fixed-elements)
 * [Endless Scrolling](#endless-scrolling)
 * [Grid View](#grid-view)
-* [SteamGifts Profile Button](#steamgifts-profile-button)
-* [SteamTrades Profile Button](#steamtrades-profile-button)
-* [Shared Groups Checker](#shared-groups-checker)
-* [Comment History](#comment-history)
-* [Username History](#username-history)
-* [Permanent User Notes](#permanent-user-notes)
-* [Permanent User Tags](#permanent-user-tags)
-* [Multi-Tag](#multi--tag)
-* [Whitelist / Blacklist Highlighter](#whitelist--blacklist-highlighter)
-* [Whitelist / Blacklist Checker](#whitelist--blacklist-checker)
-* [Real Won / Sent CV Links](#real-won--sent-cv-links)
-* [Not Activated / Multiple Wins Checker](#not-activated--multiple-wins-checker)
-* [Not Received Finder](#not-received-finder)
-* [Avatar Popout](#avatar-popout)
-* [Unsent Gifts Sender](#unsent-gifts-sender)
+* [Header Icons Refresher](#header-icons-refresher)
+* [Accurate Timestamp](#accurate-timestamp)
+* [Points Refresher](#points-refresher)
+
+## Giveaways
+
 * [Giveaway Templates](#giveaway-templates)
 * [Stickied Giveaway Groups](#stickied-giveaway-groups)
-* [Header Icons Refresher](#header-icons-refresher)
 * [Advanced Giveaway Search](#advanced-giveaway-search)
-* [Points Refresher](#points-refresher)
-* [Entered Games Highlighter](#entered-games-highlighter)
 * [Entered Giveaways Filter](#entered-giveaways-filter)
 * [Enter / Leave Giveaway Button](#enter--leave-giveaway-button)
 * [Giveaway Description / Comment Box Popup](#giveaway-description--comment-box-popup)
 * [Giveaway Winning Chance](#giveaway-winning-chance)
 * [Giveaway Groups Popout](#giveaway-groups-popout)
+* [Giveaway Winners Link](#giveaway-winners-link)
+* [Unsent Gifts Sender](#unsent-gifts-sender)
+
+## Discussions
+
 * [Discussions Highlighter](#discussions-highlighter)
+* [Main Post Popup](#main-post-popup)
+* [Discussion Edit Detector](#discussion-edit-detector)
+
+## Comments / Commenting
+
+* [Comment History](#comment-history)
 * [Comment Tracker](#comment-tracker)
-* [Accurate Timestamp](#accurate-timestamp)
 * [Comment Formatting Helper](#comment-formatting-helper)
 * [Main Comment Box Popup](#main-comment-box-popup)
 * [Multi-Reply](#multi-reply)
 * [Reply From Inbox](#reply-from-inbox)
-* [Game Tags](#game-tags)
-* [Giveaway Winners Link](#giveaway-winners-link)
-* [Main Post Popup](#main-post-popup)
-* [Discussion Edit Detector](#discussion-edit-detector)
 * [Reply Mention Link](#reply-mention-link)
+
+## Users
+
+* [Username History](#username-history)
+* [Permanent User Notes](#permanent-user-notes)
+* [Real Won / Sent CV Links](#real-won--sent-cv-links)
+* [SteamGifts Profile Button](#steamgifts-profile-button)
+* [SteamTrades Profile Button](#steamtrades-profile-button)
+* [Shared Groups Checker](#shared-groups-checker)
+* [Permanent User Tags](#permanent-user-tags)
+* [Whitelist / Blacklist Highlighter](#whitelist--blacklist-highlighter)
+* [Whitelist / Blacklist Checker](#whitelist--blacklist-checker)
+* [Not Activated / Multiple Wins Checker](#not-activated--multiple-wins-checker)
+* [Not Received Finder](#not-received-finder)
+* [Avatar Popout](#avatar-popout)
+
+## Games
+
+* [Entered Games Highlighter](#entered-games-highlighter)
+* [Game Tags](#game-tags)
+
+## Other
+
+* [Featured Container Hider](#featured-container-hider)
+* [Blacklist Stats Hider](#blacklist-stats-hider)
+* [Multi-Tag](#multi--tag)
 * [Archive Searcher](#archive-searcher)
+
 * [Other Info](#other-info)
 
 ### Settings Menu

@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.15.4
+// @version 4.15.5
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -1609,7 +1609,9 @@
     }
 
     function loadSMMenu(Sidebar, SMButton) {
-        var Selected, Item, SMSyncFrequency, I, Container, SMFeatures, ID, SMManageData, SMRecentUsernameChanges, SMCommentHistory, SMManageTags, SMLastSync, LastSync;
+        var Selected, Item, SMSyncFrequency, I, Container, SMGeneral, SMGiveaways, SMDiscussions, SMCommenting, SMUsers, SMGames, SMOthers, SMManageData, SMRecentUsernameChanges,
+            SMCommentHistory, SMManageTags, SMGeneralFeatures, SMGiveawayFeatures, SMDiscussionFeatures, SMCommentingFeatures, SMUserFeatures, SMGameFeatures, SMOtherFeatures, ID,
+            SMLastSync, LastSync;
         Selected = Sidebar.getElementsByClassName("is-selected")[0];
         Selected.classList.remove("is-selected");
         SMButton.classList.add("is-selected");
@@ -1631,8 +1633,26 @@
             "</div>" +
             "<div class=\"form__rows SMMenu\">" +
             createSMSections([{
-                Title: "Features",
-                Name: "SMFeatures"
+                Title: "General",
+                Name: "SMGeneral"
+            }, {
+                Title: "Giveaways",
+                Name: "SMGiveaways"
+            }, {
+                Title: "Discussions",
+                Name: "SMDiscussions"
+            }, {
+                Title: "Commenting",
+                Name: "SMCommenting"
+            }, {
+                Title: "Users",
+                Name: "SMUsers"
+            }, {
+                Title: "Games",
+                Name: "SMGames"
+            }, {
+                Title: "Others",
+                Name: "SMOthers"
             }, {
                 Title: "Sync Whitelist / Blacklist",
                 HTML: SMSyncFrequency + createDescription("Select from how many days to how many days you want the automatic sync to run (0 to disable it).") + (
@@ -1680,17 +1700,44 @@
             Name: "NAMWCButton",
             Title: "Manage Not Activated / Multiple Wins Checker caches."
         }]);
-        SMFeatures = Container.getElementsByClassName("SMFeatures")[0];
-        for (ID in Features) {
-            SMFeatures.appendChild(getSMFeature(Features[ID], ID));
-        }
+        SMGeneral = Container.getElementsByClassName("SMGeneral")[0];
+        SMGiveaways = Container.getElementsByClassName("SMGiveaways")[0];
+        SMDiscussions = Container.getElementsByClassName("SMDiscussions")[0];
+        SMCommenting = Container.getElementsByClassName("SMCommenting")[0];
+        SMUsers = Container.getElementsByClassName("SMUsers")[0];
+        SMGames = Container.getElementsByClassName("SMGames")[0];
+        SMOthers = Container.getElementsByClassName("SMOthers")[0];
         SMManageData = Container.getElementsByClassName("SMManageData")[0];
         SMRecentUsernameChanges = Container.getElementsByClassName("SMRecentUsernameChanges")[0];
         SMCommentHistory = Container.getElementsByClassName("SMCommentHistory")[0];
         SMManageTags = Container.getElementsByClassName("SMManageTags")[0];
         SMSyncFrequency = Container.getElementsByClassName("SMSyncFrequency")[0];
-        SMSyncFrequency.selectedIndex = GM_getValue("SyncFrequency");
         SMLastSync = Container.getElementsByClassName("SMLastSync")[0];
+        SMGeneralFeatures = ["FE", "ES", "GV", "HIR", "AT", "PR"];
+        SMGiveawayFeatures = ["GTS", "SGG", "AGS", "EGF", "ELGB", "GDCBP", "GWC", "GGP", "GWL", "UGS"];
+        SMDiscussionFeatures = ["DH", "MPP", "DED"];
+        SMCommentingFeatures = ["CH", "CT", "CFH", "MCBP", "MR", "RFI", "RML"];
+        SMUserFeatures = ["UH", "PUN", "RWSCVL", "SGPB", "STPB", "SGC", "PUT", "WBH", "WBC", "NAMWC", "NRF", "AP"];
+        SMGameFeatures = ["EGH", "GT"];
+        SMOtherFeatures = ["FCH", "BSH", "MT", "AS"];
+        for (ID in Features) {
+            if (SMGeneralFeatures.indexOf(ID) >= 0) {
+                SMGeneral.appendChild(getSMFeature(Features[ID], ID));
+            } else if (SMGiveawayFeatures.indexOf(ID) >= 0) {
+                SMGiveaways.appendChild(getSMFeature(Features[ID], ID));
+            } else if (SMDiscussionFeatures.indexOf(ID) >= 0) {
+                SMDiscussions.appendChild(getSMFeature(Features[ID], ID));
+            } else if (SMCommentingFeatures.indexOf(ID) >= 0) {
+                SMCommenting.appendChild(getSMFeature(Features[ID], ID));
+            } else if (SMUserFeatures.indexOf(ID) >= 0) {
+                SMUsers.appendChild(getSMFeature(Features[ID], ID));
+            } else if (SMGameFeatures.indexOf(ID) >= 0) {
+                SMGames.appendChild(getSMFeature(Features[ID], ID));
+            } else if (SMOtherFeatures.indexOf(ID) >= 0) {
+                SMOthers.appendChild(getSMFeature(Features[ID], ID));
+            }
+        }
+        SMSyncFrequency.selectedIndex = GM_getValue("SyncFrequency");
         LastSync = GM_getValue("LastSync");
         if (LastSync) {
             SMLastSync.classList.remove("notification--warning");
@@ -1948,8 +1995,11 @@
         Menu = document.createElement("div");
         Menu.insertAdjacentHTML(
             "beforeEnd",
-            "<span></span>" +
-            "<span> " + Feature.Name + "</span>" +
+            "<span></span>" + (ID.match(/_/) ? (
+                "<span> " + Feature.Name + "</span>") : (
+                "<span class=\"popup__actions\">" +
+                "    <a href=\"https://github.com/revilheart/rhSGST#" + Feature.Name.replace(/-/g, "-").replace(/\s/g, "-").toLowerCase() + "\" target=\"_blank\">" + Feature.Name + "</a>" +
+                "</span>")) +
             "<div class=\"form__row__indent SMFeatures rhHidden\"></div>"
         );
         Checkbox = Menu.firstElementChild;
