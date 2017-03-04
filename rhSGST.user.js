@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.15.5
+// @version 4.15.6
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -35,12 +35,6 @@
     XSRFToken = document.querySelector("[name='xsrf_token']");
     XSRFToken = XSRFToken ? XSRFToken.value : "";
     Features = {
-        FCH: {
-            Name: "Featured Container Hider"
-        },
-        BSH: {
-            Name: "Blacklist Stats Hider"
-        },
         FE: {
             Name: "Fixed Elements",
             FE_H: {
@@ -83,77 +77,11 @@
         GV: {
             Name: "Grid View"
         },
-        SGPB: {
-            Name: "SteamGifts Profile Button"
-        },
-        STPB: {
-            Name: "SteamTrades Profile Button"
-        },
-		SGC: {
-			Name: "Shared Groups Checker"
-		},
-        CH: {
-            Name: "Comment History"
-        },
-        UH: {
-            Name: "Username History"
-        },
-        PUN: {
-            Name: "Permanent User Notes"
-        },
-        PUT: {
-            Name: "Permanent User Tags"
-        },
-        MT: {
-            Name: "Multi-Tag"
-        },
-        WBH: {
-            Name: "Whitelist / Blacklist Highlighter"
-        },
-        WBC: {
-            Name: "Whitelist / Blacklist Checker",
-            WBC_B: {
-                Name: "Show blacklist information."
-            },
-            WBC_H: {
-                Name: "Highlight users who have whitelisted / blacklisted you."
-            }
-        },
-        RWSCVL: {
-            Name: "Real Won / Sent CV Links",
-            RWSCVL_RO: {
-                Name: "Reverse order (from new to old)."
-            }
-        },
-        NAMWC: {
-            Name: "Not Activated / Multiple Wins Checker",
-            NAMWC_H: {
-                Name: "Highlight users."
-            }
-        },
-        NRF: {
-            Name: "Not Received Finder"
-        },
-        AP: {
-            Name: "Avatar Popout"
-        },
-        UGS: {
-            Name: "Unsent Gifts Sender"
-        },
-        GTS: {
-            Name: "Giveaway Templates"
-        },
-        SGG: {
-            Name: "Stickied Giveaway Groups"
-        },
         HIR: {
             Name: "Header Icons Refresher",
             HIR_B: {
                 Name: "Run in the background and change the icon of the tab if new messages are found."
             }
-        },
-        AGS: {
-            Name: "Advanced Giveaway Search"
         },
         PR: {
             Name: "Points Refresher",
@@ -161,8 +89,20 @@
                 Name: "Run in the background and display the points in the title of the tab upon refreshing."
             }
         },
-        EGH: {
-            Name: "Entered Games Highlighter"
+        AT: {
+            Name: "Accurate Timestamp",
+            AT_G: {
+                Name: "Enable in the main giveaways pages."
+            }
+        },
+        GTS: {
+            Name: "Giveaway Templates"
+        },
+        SGG: {
+            Name: "Stickied Giveaway Groups"
+        },
+        AGS: {
+            Name: "Advanced Giveaway Search"
         },
         EGF: {
             Name: "Entered Giveaways Filter"
@@ -182,14 +122,29 @@
         GWC: {
             Name: "Giveaway Winning Chance"
         },
-        GH: {
-            Name: "Groups Highlighter"
-        },
         GGP: {
             Name: "Giveaway Groups Popout"
         },
+        GWL: {
+            Name: "Giveaway Winners Link"
+        },
+        UGS: {
+            Name: "Unsent Gifts Sender"
+        },
         DH: {
             Name: "Discussions Highlighter"
+        },
+        MPP: {
+            Name: "Main Post Popup",
+            MPP_FV: {
+                Name: "Hide main post after first visit."
+            }
+        },
+        DED: {
+            Name: "Discussion Edit Detector"
+        },
+        CH: {
+            Name: "Comment History"
         },
         CT: {
             Name: "Comment Tracker",
@@ -198,12 +153,6 @@
             },
             CT_LU: {
                 Name: "Go to the last unread comment of a discussion instead of the first one from the discussions page."
-            }
-        },
-        AT: {
-            Name: "Accurate Timestamp",
-            AT_G: {
-                Name: "Enable in the main giveaways pages."
             }
         },
         CFH: {
@@ -272,23 +221,74 @@
         RFI: {
             Name: "Reply From Inbox"
         },
+        RML: {
+            Name: "Reply Mention Link"
+        },
+        UH: {
+            Name: "Username History"
+        },
+        PUN: {
+            Name: "Permanent User Notes"
+        },
+        RWSCVL: {
+            Name: "Real Won / Sent CV Links",
+            RWSCVL_RO: {
+                Name: "Reverse order (from new to old)."
+            }
+        },
+        SGPB: {
+            Name: "SteamGifts Profile Button"
+        },
+        STPB: {
+            Name: "SteamTrades Profile Button"
+        },
+		SGC: {
+			Name: "Shared Groups Checker"
+		},
+        PUT: {
+            Name: "Permanent User Tags"
+        },
+        WBH: {
+            Name: "Whitelist / Blacklist Highlighter"
+        },
+        WBC: {
+            Name: "Whitelist / Blacklist Checker",
+            WBC_B: {
+                Name: "Show blacklist information."
+            },
+            WBC_H: {
+                Name: "Highlight users who have whitelisted / blacklisted you."
+            }
+        },
+        NAMWC: {
+            Name: "Not Activated / Multiple Wins Checker",
+            NAMWC_H: {
+                Name: "Highlight users."
+            }
+        },
+        NRF: {
+            Name: "Not Received Finder"
+        },
+        AP: {
+            Name: "Avatar Popout"
+        },
+        EGH: {
+            Name: "Entered Games Highlighter"
+        },
         GT: {
             Name: "Game Tags"
         },
-        GWL: {
-            Name: "Giveaway Winners Link"
+        FCH: {
+            Name: "Featured Container Hider"
         },
-        MPP: {
-            Name: "Main Post Popup",
-            MPP_FV: {
-                Name: "Hide main post after first visit."
-            }
+        BSH: {
+            Name: "Blacklist Stats Hider"
         },
-        DED: {
-            Name: "Discussion Edit Detector"
+        MT: {
+            Name: "Multi-Tag"
         },
-        RML: {
-            Name: "Reply Mention Link"
+        GH: {
+            Name: "Groups Highlighter"
         },
         AS: {
             Name: "Archive Searcher"
@@ -1719,7 +1719,7 @@
         SMCommentingFeatures = ["CH", "CT", "CFH", "MCBP", "MR", "RFI", "RML"];
         SMUserFeatures = ["UH", "PUN", "RWSCVL", "SGPB", "STPB", "SGC", "PUT", "WBH", "WBC", "NAMWC", "NRF", "AP"];
         SMGameFeatures = ["EGH", "GT"];
-        SMOtherFeatures = ["FCH", "BSH", "MT", "AS"];
+        SMOtherFeatures = ["FCH", "BSH", "MT", "GH", "AS", "SM_D"];
         for (ID in Features) {
             if (SMGeneralFeatures.indexOf(ID) >= 0) {
                 SMGeneral.appendChild(getSMFeature(Features[ID], ID));
@@ -1998,7 +1998,7 @@
             "<span></span>" + (ID.match(/_/) ? (
                 "<span> " + Feature.Name + "</span>") : (
                 "<span class=\"popup__actions\">" +
-                "    <a href=\"https://github.com/revilheart/rhSGST#" + Feature.Name.replace(/-/g, "-").replace(/\s/g, "-").toLowerCase() + "\" target=\"_blank\">" + Feature.Name + "</a>" +
+                "    <a href=\"https://github.com/revilheart/rhSGST#" + Feature.Name.replace(/(-|\s)/g, "-").replace(/\//g, "").toLowerCase() + "\" target=\"_blank\">" + Feature.Name + "</a>" +
                 "</span>")) +
             "<div class=\"form__row__indent SMFeatures rhHidden\"></div>"
         );

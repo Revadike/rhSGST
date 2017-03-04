@@ -85,7 +85,8 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 
 * [Featured Container Hider](#featured-container-hider)
 * [Blacklist Stats Hider](#blacklist-stats-hider)
-* [Multi-Tag](#multi--tag)
+* [Multi-Tag](#multi-tag)
+* [Groups Highlighter](#groups-highlighter)
 * [Archive Searcher](#archive-searcher)
 
 * [Other Info](#other-info)
