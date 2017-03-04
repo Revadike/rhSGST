@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.15.1
+// @version 4.15.2
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -21,6 +21,7 @@
 // @connect steamcommunity.com
 // @require https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js
 // @require https://greasyfork.org/scripts/26575-bpopup/code/bPopup.js?version=169515
+// @require https://cdn.steamgifts.com/js/highcharts.js
 // @run-at document-end
 // ==/UserScript==
 
@@ -278,7 +279,10 @@
             Name: "Giveaway Winners Link"
         },
         MPP: {
-            Name: "Main Post Popup"
+            Name: "Main Post Popup",
+            MPP_FV: {
+                Name: "Hide main post after first visit."
+            }
         },
         DED: {
             Name: "Discussion Edit Detector"
@@ -417,6 +421,9 @@
             addAGSPanel();
         } else if (GM_getValue("GWC") && Path.match(/^\/giveaways\/entered/)) {
             addGWCHeading();
+        }
+        if (GM_getValue("DH") && Path.match(/^\/discussion\//)) {
+            highlightDHDiscussion();
         }
         if (Path.match(/^\/giveaway\//)) {
             if (GM_getValue("GWC")) {
@@ -607,6 +614,11 @@
             Callback: addASButton
         }]);
         loadMatchesFeatures(Context, [{
+            Check: GM_getValue("SGG") && Path.match(/^\/account\/steam\/groups/),
+            Query: ".table__row-inner-wrap",
+            Callback: setSGGGroups,
+            All: true
+        }, {
             Check: GM_getValue("AP"),
             Query: ".global__image-outer-wrap--avatar-small",
             Callback: addAPContainer
@@ -727,9 +739,12 @@
         var CurrentDate;
         Element.Request = setInterval(function() {
             CurrentDate = new Date().getTime();
-            if ((CurrentDate - GM_getValue("LastRequest")) > 300000) {
+            if ((CurrentDate - GM_getValue("LastRequest")) > 5000) {
                 clearInterval(Element.Request);
                 GM_setValue("LastRequest", CurrentDate);
+                if (Element.Progress) {
+                    Element.Progress.innerHTML = "";
+                }
                 makeRequest(Data, URL, Element.Progress, function(Response) {
                     GM_setValue("LastRequest", 0);
                     Callback(Response);
@@ -771,35 +786,41 @@
         }
     }
 
-    function queueSave(Element, User, Callback) {
+    function queueSave(Element, Callback) {
         var CurrentDate;
-        CurrentDate = new Date().getTime();
-        if ((CurrentDate - GM_getValue("LastSave")) > 300000) {
-            GM_setValue("LastSave", CurrentDate);
-            setUser(User, Element, function() {
-                GM_setValue("LastSave", 0);
+        Element.Save = setInterval(function() {
+            CurrentDate = new Date().getTime();
+            if ((CurrentDate - GM_getValue("LastSave")) > 5000) {
+                clearInterval(Element.Save);
+                GM_setValue("LastSave", CurrentDate);
+                Element.Progress.innerHTML = "";
                 Callback();
-            });
-        } else {
-            Element.Save = setInterval(function() {
-                CurrentDate = new Date().getTime();
-                if ((CurrentDate - GM_getValue("LastSave")) > 300000) {
-                    clearInterval(Element.Save);
-                    GM_setValue("LastSave", CurrentDate);
-                    setUser(User, Element, function() {
-                        GM_setValue("LastSave", 0);
-                        Callback();
-                    });
-                } else {
-                    Element.Progress.innerHTML =
-                        "<i class=\"fa fa-clock-o\"></i> " +
-                        "<span>Waiting for a free save slot...</span>";
-                }
-            }, 100);
-        }
+            } else {
+                Element.Progress.innerHTML =
+                    "<i class=\"fa fa-clock-o\"></i> " +
+                    "<span>Waiting for a free save slot...</span>";
+            }
+        }, 100);
     }
 
-    function setUser(User, Element, Callback) {
+    function updateUsers(UpdatedUsers) {
+        var SavedUsers, I, N, User, J, Key;
+        SavedUsers = GM_getValue("Users");
+        for (I = 0, N = UpdatedUsers.length; I < N; ++I) {
+            User = UpdatedUsers[I];
+            J = getUserIndex(User, SavedUsers);
+            if (J >= 0) {
+                for (Key in User) {
+                    SavedUsers[J][Key] = User[Key];
+                }
+            } else {
+                SavedUsers.push(User);
+            }
+        }
+        GM_setValue("Users", SavedUsers);
+    }
+
+    function saveUser(User, Element, Callback) {
         var SavedUsers, I;
         SavedUsers = GM_getValue("Users");
         I = getUserIndex(User, SavedUsers);
@@ -812,11 +833,8 @@
             GM_setValue("Users", SavedUsers);
             Callback();
         } else {
-            queueRequest(Element, null, "https://www.steamgifts.com" + (SG ? "" : "/go") + "/user/" + (SG ? User.Username : User.SteamID64), function(Response) {
-                var ResponseHTML;
-                ResponseHTML = parseHTML(Response.responseText);
+            setUser(Element, User, function() {
                 if (SG) {
-                    User.SteamID64 = ResponseHTML.querySelector("a[href*='/profiles/']").getAttribute("href").match(/\d+/)[0];
                     I = getUserIndex(User, SavedUsers);
                     if (I >= 0) {
                         checkUsernameChange(User, SavedUsers[I]);
@@ -824,15 +842,27 @@
                         SavedUsers.push(User);
                     }
                 } else {
-                    User.Username = Response.finalUrl.match(/\/user\/(.+)/)[1];
                     SavedUsers.push(User);
                 }
-                User.ID = ResponseHTML.querySelector("input[name='child_user_id']");
-                User.ID = User.ID ? User.ID.value : "";
                 GM_setValue("Users", SavedUsers);
                 Callback();
             });
         }
+    }
+
+    function setUser(Element, User, Callback) {
+        queueRequest(Element, null, "https://www.steamgifts.com" + (SG ? "" : "/go") + "/user/" + (SG ? User.Username : User.SteamID64), function(Response) {
+            var ResponseHTML;
+            ResponseHTML = parseHTML(Response.responseText);
+            if (SG) {
+                User.SteamID64 = ResponseHTML.querySelector("a[href*='/profiles/']").getAttribute("href").match(/\d+/)[0];
+            } else {
+                User.Username = Response.finalUrl.match(/\/user\/(.+)/)[1];
+            }
+            User.ID = ResponseHTML.querySelector("input[name='child_user_id']");
+            User.ID = User.ID ? User.ID.value : "";
+            Callback();
+        });
     }
 
     function getUserID(User, Element, Callback) {
@@ -1001,8 +1031,9 @@
         Sync.OverallProgress.innerHTML =
             "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
             "<span>Syncing your Steam groups...</span>";
-        syncGroups(Sync, "/account/steam/groups/search?page=", 1, [], function(Groups) {
-            GM_setValue("Groups", Groups);
+        Sync.Groups = [];
+        syncGroups(Sync, "/account/steam/groups/search?page=", 1, function() {
+            GM_setValue("Groups", Sync.Groups);
             Sync.OverallProgress.innerHTML =
                 "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
                 "<span>Syncing your whitelist / blacklist...</span>";
@@ -1015,23 +1046,23 @@
         });
     }
 
-    function syncGroups(Sync, URL, NextPage, Groups, Callback) {
+    function syncGroups(Sync, URL, NextPage, Callback) {
         if (!Sync.Canceled) {
             queueRequest(Sync, null, URL + NextPage, function(Response) {
                 var ResponseHTML, Matches, I, N, Pagination;
                 ResponseHTML = parseHTML(Response.responseText);
                 Matches = ResponseHTML.getElementsByClassName("table__column__heading");
                 for (I = 0, N = Matches.length; I < N; ++I) {
-                    Groups.push({
-                        Code: Matches[I].getAttribute("href").match(/group\/(.+)\//)[1],
+                    Sync.Groups.push({
+                        Code: Matches[I].getAttribute("href").match(/group\/(.+?)\//)[1],
                         Name: Matches[I].textContent
                     });
                 }
                 Pagination = ResponseHTML.getElementsByClassName("pagination__navigation")[0];
                 if (Pagination && !Pagination.lastElementChild.classList.contains("is-selected")) {
-                    syncGroups(Sync, URL, ++NextPage, Groups, Callback);
+                    syncGroups(Sync, URL, ++NextPage, Callback);
                 } else {
-                    Callback(Groups);
+                    Callback();
                 }
             });
         }
@@ -1040,33 +1071,33 @@
     function syncWhitelistBlacklist(Sync, Callback) {
         var SavedUsers;
         if (!Sync.Canceled) {
+            Sync.Users = [];
             SavedUsers = GM_getValue("Users");
             clearWhitelistBlacklist(Sync, 0, SavedUsers.length, SavedUsers, function() {
                 getWhitelistBlacklist(Sync, "/account/manage/whitelist/search?page=", 1, "Whitelisted", function() {
-                    getWhitelistBlacklist(Sync, "/account/manage/blacklist/search?page=", 1, "Blacklisted", Callback);
+                    getWhitelistBlacklist(Sync, "/account/manage/blacklist/search?page=", 1, "Blacklisted", function() {
+                        queueSave(Sync, function() {
+                            updateUsers(Sync.Users);
+                            GM_setValue("LastSave", 0);
+                            Callback();
+                        });
+                    });
                 });
             });
         }
     }
 
-    function clearWhitelistBlacklist(Sync, I, N, Users, Callback) {
-        var User;
+    function clearWhitelistBlacklist(Sync, I, N, SavedUsers, Callback) {
         if (!Sync.Canceled) {
             if (I < N) {
-                if (Users[I].Whitelisted || Users[I].Blacklisted) {
-                    User = {
-                        Username: Users[I].Username,
-                        ID: Users[I].ID,
-                        SteamID64: Users[I].SteamID64,
-                        Whitelisted: false,
-                        Blacklisted: false
-                    };
-                    queueSave(Sync, User, function() {
-                        setTimeout(clearWhitelistBlacklist, 0, Sync, ++I, N, Users, Callback);
-                    });
-                } else {
-                    setTimeout(clearWhitelistBlacklist, 0, Sync, ++I, N, Users, Callback);
-                }
+                Sync.Users.push({
+                    Username: SavedUsers[I].Username,
+                    ID: SavedUsers[I].ID,
+                    SteamID64: SavedUsers[I].SteamID64,
+                    Whitelisted: false,
+                    Blacklisted: false
+                });
+                setTimeout(clearWhitelistBlacklist, 0, Sync, ++I, N, SavedUsers, Callback);
             } else {
                 Callback();
             }
@@ -1093,16 +1124,23 @@
     }
 
     function getWhitelistBlacklistUsers(Sync, I, N, Matches, Key, Callback) {
-        var User;
+        var User, J;
         if (!Sync.Canceled) {
             if (I < N) {
                 User = {
                     Username: Matches[I].textContent
                 };
-                User[Key] = true;
-                queueSave(Sync, User, function() {
+                J = getUserIndex(User, Sync.Users);
+                if (J >= 0) {
+                    Sync.Users[J][Key] = true;
                     setTimeout(getWhitelistBlacklistUsers, 0, Sync, ++I, N, Matches, Key, Callback);
-                });
+                } else {
+                    setUser(Sync, User, function() {
+                        User[Key] = true;
+                        Sync.Users.push(User);
+                        setTimeout(getWhitelistBlacklistUsers, 0, Sync, ++I, N, Matches, Key, Callback);
+                    });
+                }
             } else {
                 Callback();
             }
@@ -2024,22 +2062,43 @@
     // Blacklist Stats Hider
 
     function hideBSHStats() {
-        var Context, Interval;
-        Context = document.getElementsByClassName("chart")[4];
-        Context = Context.firstElementChild;
+        var Chart, Match, Points, N, Data, I, CountDate, Year, Month, Day, Count, Context;
+        Chart = document.getElementsByClassName("chart")[4];
+        Match = Chart.previousElementSibling.textContent.match(/"Whitelists", data: \[(.+)\]},/)[1];
+        Points = Match.split(/\],\[/);
+        N = Points.length - 1;
+        Points[0] = Points[0].replace(/^\[/, "");
+        Points[N] = Points[N].replace(/\/]$/, "");
+        Data = [];
+        for (I = 0; I <= N; ++I) {
+            Match = Points[I].match(/(.+), (.+)/);
+            CountDate = Match[1].match(/\((.+?),(.+?),(.+?)\)/);
+            Year = parseInt(CountDate[1]);
+            Month = parseInt(CountDate[2]);
+            Day = parseInt(CountDate[3]);
+            Count = parseInt(Match[2]);
+            Data.push([Date.UTC(Year, Month, Day), Count]);
+        }
+        Context = Chart.firstElementChild;
         Context.lastElementChild.remove();
         Context.lastElementChild.remove();
         Context = Context.nextElementSibling;
         Context.textContent = Context.textContent.replace(/and blacklists\s/, "");
         Context = Context.nextElementSibling;
-        Interval = setInterval(function() {
-            var Chart;
-            Chart = Context.getElementsByClassName("highcharts-series highcharts-series-1")[0];
-            if (Chart) {
-                clearInterval(Interval);
-                Chart.remove();
-            }
-        }, 0);
+        $(function() {
+            chart_options.graph = {
+                colors: ["#6187d4", "#ec656c"],
+                tooltip: {
+                    headerFormat: "<p class=\"chart__tooltip-header\">{point.key}</p>",
+                    pointFormat: "<p class=\"chart__tooltip-point\" style=\"color: {point.color};\">{point.y:,.0f} {series.name}</p>"
+                },
+                series: [{
+                    name: "Whitelists",
+                    data: Data
+                }]
+            };
+            $(Context).highcharts(Highcharts.merge(chart_options.default, chart_options.areaspline, chart_options.datetime, chart_options.graph));
+        });
     }
 
     // Fixed Elements
@@ -2693,16 +2752,19 @@
             Popup.TextArea.classList.remove("rhHidden");
             createButton(Popup.Button, "fa-check", "Save", "fa-circle-o-notch fa-spin", "Saving...", function(Callback) {
                 User.Notes = Popup.TextArea.value.trim();
-                queueSave(Popup, User, function() {
-                    if (User.Notes) {
-                        PUNIcon.classList.remove("fa-sticky-note-o");
-                        PUNIcon.classList.add("fa-sticky-note");
-                    } else {
-                        PUNIcon.classList.remove("fa-sticky-note");
-                        PUNIcon.classList.add("fa-sticky-note-o");
-                    }
-                    Callback();
-                    Popup.Close.click();
+                queueSave(Popup, function() {
+                    saveUser(User, Popup, function() {
+                        GM_setValue("LastSave", 0);
+                        if (User.Notes) {
+                            PUNIcon.classList.remove("fa-sticky-note-o");
+                            PUNIcon.classList.add("fa-sticky-note");
+                        } else {
+                            PUNIcon.classList.remove("fa-sticky-note");
+                            PUNIcon.classList.add("fa-sticky-note-o");
+                        }
+                        Callback();
+                        Popup.Close.click();
+                    });
                 });
             });
             Popup.popUp(function() {
@@ -2743,10 +2805,13 @@
                 User.Tags = Popup.TextInput.value.replace(/(,\s*)+/g, function(Match, P1, Offset, String) {
                     return (((Offset === 0) || (Offset == (String.length - Match.length))) ? "" : ", ");
                 });
-                queueSave(Popup, User, function() {
-                    addPUTTags(UserID, getUser(User).Tags);
-                    Callback();
-                    Popup.Close.click();
+                queueSave(Popup, function() {
+                    saveUser(User, Popup, function() {
+                        GM_setValue("LastSave", 0);
+                        addPUTTags(UserID, getUser(User).Tags);
+                        Callback();
+                        Popup.Close.click();
+                    });
                 });
             });
             Popup.popUp(function() {
@@ -3053,9 +3118,12 @@
                     Tags: Individual ? (Shared + ", " + Tags[UserID]) : Shared
                 };
                 User[SG ? "Username" : "SteamID64"] = UserID;
-                queueSave(MT, User, function() {
-                    addPUTTags(UserID, getUser(User).Tags);
-                    setTimeout(saveMTUserTags, 0, MT, ++I, N, Keys, Individual, Shared, Tags, Callback);
+                queueSave(MT, function() {
+                    saveUser(User, MT, function() {
+                        GM_setValue("LastSave", 0);
+                        addPUTTags(UserID, getUser(User).Tags);
+                        setTimeout(saveMTUserTags, 0, MT, ++I, N, Keys, Individual, Shared, Tags, Callback);
+                    });
                 });
             } else {
                 Callback();
@@ -3186,15 +3254,6 @@
             Name: "SimpleUpdate",
             Key: "SU",
             ID: "WBC_SU"
-        }, {
-            Check: function() {
-                return true;
-            },
-            Description: "Clear caches.",
-            Title: "If enabled, the caches of all checked users will be cleared and they will be checked as if for the first time (slower).",
-            Name: "ClearCaches",
-            Key: "CC",
-            ID: "WBC_CC"
         }]);
         Popup.Options.insertAdjacentHTML("afterEnd", createDescription("If an user is highlighted, that means they have been either checked for the first time or updated."));
         if (Context) {
@@ -3329,16 +3388,19 @@
                 User = (WBC.User && WBC.SC.checked) ? WBC.User : {
                     Username: WBC.Users[I]
                 };
-                queueSave(WBC, User, function() {
-                    SavedUser = getUser(User);
-                    User.WBC = SavedUser.WBC;
-                    if (User.WBC && User.WBC.Result) {
-                        Result = User.WBC.Result;
-                    }
-                    User.Whitelisted = SavedUser.Whitelisted;
-                    User.Blacklisted = SavedUser.Blacklisted;
-                    checkWBCUser(WBC, User, function() {
-                        setTimeout(setWBCResult, 0, WBC, User, (Result != User.WBC.Result) ? true : false, I, N, Callback);
+                queueSave(WBC, function() {
+                    saveUser(User, WBC, function() {
+                        GM_setValue("LastSave", 0);
+                        SavedUser = getUser(User);
+                        User.WBC = SavedUser.WBC;
+                        if (User.WBC && User.WBC.Result) {
+                            Result = User.WBC.Result;
+                        }
+                        User.Whitelisted = SavedUser.Whitelisted;
+                        User.Blacklisted = SavedUser.Blacklisted;
+                        checkWBCUser(WBC, User, function() {
+                            setTimeout(setWBCResult, 0, WBC, User, (Result != User.WBC.Result) ? true : false, I, N, Callback);
+                        });
                     });
                 });
             } else if (Callback) {
@@ -3360,8 +3422,11 @@
                     getUserID(User, WBC, function() {
                         if (XSRFToken) {
                             returnWBCWhitelistBlacklist(WBC, User, function() {
-                                queueSave(WBC, User, function() {
-                                    setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
+                                queueSave(WBC, function() {
+                                    saveUser(User, WBC, function() {
+                                        GM_setValue("LastSave", 0);
+                                        setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
+                                    });
                                 });
                             });
                         } else {
@@ -3369,8 +3434,11 @@
                             if (XSRFToken) {
                                 XSRFToken = XSRFToken.value;
                                 returnWBCWhitelistBlacklist(WBC, User, function() {
-                                    queueSave(WBC, User, function() {
-                                        setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
+                                    queueSave(WBC, function() {
+                                        saveUser(User, WBC, function() {
+                                            GM_setValue("LastSave", 0);
+                                            setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
+                                        });
                                     });
                                 });
                             } else {
@@ -3378,13 +3446,19 @@
                                     if (Response.finalUrl.match(/\/user\//)) {
                                         XSRFToken = parseHTML(Response.responseText).querySelector("[name='xsrf_token']").value;
                                         returnWBCWhitelistBlacklist(WBC, User, function() {
-                                            queueSave(WBC, User, function() {
-                                                setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
+                                            queueSave(WBC, function() {
+                                                saveUser(User, WBC, function() {
+                                                    GM_setValue("LastSave", 0);
+                                                    setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
+                                                });
                                             });
                                         });
                                     } else {
-                                        queueSave(WBC, User, function() {
-                                            setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
+                                        queueSave(WBC, function() {
+                                            saveUser(User, WBC, function() {
+                                                GM_setValue("LastSave", 0);
+                                                setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
+                                            });
                                         });
                                     }
                                 });
@@ -3392,8 +3466,11 @@
                         }
                     });
                 } else {
-                    queueSave(WBC, User, function() {
-                        setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
+                    queueSave(WBC, function() {
+                        saveUser(User, WBC, function() {
+                            GM_setValue("LastSave", 0);
+                            setTimeout(checkWBCUsers, 0, WBC, ++I, N, Callback);
+                        });
                     });
                 }
             }
@@ -3430,9 +3507,6 @@
     function checkWBCUser(WBC, User, Callback) {
         var Match;
         if (!WBC.Canceled) {
-            if (WBC.CC.checked) {
-                User.WBC = null;
-            }
             if (!User.WBC) {
                 User.WBC = {
                     LastSearch: 0,
@@ -3767,15 +3841,6 @@
                 Key: "MC",
                 ID: "NAMWC_MC",
                 Dependency: "NotActivatedCheck"
-            }, {
-                Check: function() {
-                    return true;
-                },
-                Description: "Clear caches.",
-                Title: "If enabled, the cache of all checked users will be cleared and they will be checked as if for the first time (slower).",
-                Name: "ClearCaches",
-                Key: "CC",
-                ID: "NAMWC_CC"
             }]);
             Popup.Options.insertAdjacentHTML("afterEnd", createDescription("If an user is highlighted, that means they have been either checked for the first time or updated."));
             createButton(Popup.Button, "fa-question-circle", "Check", "fa-times-circle", "Cancel", function(Callback) {
@@ -3881,24 +3946,27 @@
                 User = NAMWC.User ? NAMWC.User : {
                     Username: NAMWC.Users[I]
                 };
-                queueSave(NAMWC, User, function() {
-                    User.NAMWC = getUser(User).NAMWC;
-                    updateNAMWCResults(User, NAMWC, function() {
-                        if (User.NAMWC && User.NAMWC.Results) {
-                            Results = User.NAMWC.Results;
-                        }
-                        checkNAMWCUser(NAMWC, User, function() {
-                            if (Results) {
-                                for (Key in Results) {
-                                    if (Results[Key] != User.NAMWC.Results[Key]) {
-                                        New = true;
-                                        break;
-                                    }
-                                }
-                            } else {
-                                New = true;
+                queueSave(NAMWC, function() {
+                    saveUser(User, NAMWC, function() {
+                        GM_setValue("LastSave", 0);
+                        User.NAMWC = getUser(User).NAMWC;
+                        updateNAMWCResults(User, NAMWC, function() {
+                            if (User.NAMWC && User.NAMWC.Results) {
+                                Results = User.NAMWC.Results;
                             }
-                            setTimeout(setNAMWCResult, 0, NAMWC, User, New, I, N, Callback);
+                            checkNAMWCUser(NAMWC, User, function() {
+                                if (Results) {
+                                    for (Key in Results) {
+                                        if (Results[Key] != User.NAMWC.Results[Key]) {
+                                            New = true;
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    New = true;
+                                }
+                                setTimeout(setNAMWCResult, 0, NAMWC, User, New, I, N, Callback);
+                            });
                         });
                     });
                 });
@@ -3919,7 +3987,12 @@
                 Multiple: Results.Multiple,
                 Unknown: Results.PrivateDown
             };
-            queueSave(NAMWC, User, Callback);
+            queueSave(NAMWC, function() {
+                saveUser(User, NAMWC, function() {
+                    GM_setValue("LastSave", 0);
+                    Callback();
+                });
+            });
         } else {
             Callback();
         }
@@ -3941,8 +4014,11 @@
             }
             if (!NAMWC.ShowResults) {
                 NAMWC.Popup.reposition();
-                queueSave(NAMWC, User, function() {
-                    setTimeout(checkNAMWCUsers, 0, NAMWC, ++I, N, Callback);
+                queueSave(NAMWC, function() {
+                    saveUser(User, NAMWC, function() {
+                        GM_setValue("LastSave", 0);
+                        setTimeout(checkNAMWCUsers, 0, NAMWC, ++I, N, Callback);
+                    });
                 });
             }
         }
@@ -3950,9 +4026,6 @@
 
     function checkNAMWCUser(NAMWC, User, Callback) {
         if (!NAMWC.Canceled) {
-            if (NAMWC.CC.checked) {
-                User.NAMWC = null;
-            }
             if (!User.NAMWC) {
                 User.NAMWC = {
                     LastSearch: 0,
@@ -4072,15 +4145,6 @@
             Name: "FullSearch",
             Key: "FS",
             ID: "NRF_FS"
-        }, {
-            Check: function() {
-                return true;
-            },
-            Description: "Clear cache.",
-            Title: "If enabled, the user's cache will be cleared and they will be searched as if for the first time (slower).",
-            Name: "ClearCache",
-            Key: "CC",
-            ID: "NRF_CC"
         }]);
         Popup.Options.insertAdjacentHTML("afterEnd", createDescription("If you're blacklisted / not whitelisted / not a member of the same Steam groups, not all giveaways will be found."));
         createButton(Popup.Button, "fa-search", "Find", "fa-times-circle", "Cancel", function(Callback) {
@@ -4111,35 +4175,40 @@
         NRF.Progress.innerHTML = NRF.OverallProgress.innerHTML = NRF.Results.innerHTML = "";
         NRF.Popup.reposition();
         NRF.Canceled = false;
-        queueSave(NRF, User, function() {
-            var Match;
-            User.NRF = getUser(User).NRF;
-            if (NRF.CC.checked) {
-                User.NRF = null;
-            }
-            if (!User.NRF) {
-                User.NRF = {
-                    LastSearch: 0,
-                    OverallProgress: "",
-                    Results: ""
-                };
-            }
-            if (((new Date().getTime()) - User.NRF.LastSearch) > 604800000) {
-                Match = Location.match(new RegExp("\/user\/" + User.Username + "(\/search\?page=(\d+))?"));
-                searchNRFUser(NRF, User, 1, Match ? (Match[2] ? parseInt(Match[2]) : 1) : 0, "/user/" + User.Username + "/search?page=", function() {
-                    User.NRF.LastSearch = new Date().getTime();
-                    User.NRF.OverallProgress = NRF.OverallProgress.innerHTML;
-                    User.NRF.Results = NRF.Results.innerHTML;
+        queueSave(NRF, function() {
+            saveUser(User, NRF, function() {
+                var Match;
+                GM_setValue("LastSave", 0);
+                User.NRF = getUser(User).NRF;
+                if (!User.NRF) {
+                    User.NRF = {
+                        LastSearch: 0,
+                        OverallProgress: "",
+                        Results: ""
+                    };
+                }
+                if (((new Date().getTime()) - User.NRF.LastSearch) > 604800000) {
+                    Match = Location.match(new RegExp("\/user\/" + User.Username + "(\/search\?page=(\d+))?"));
+                    searchNRFUser(NRF, User, 1, Match ? (Match[2] ? parseInt(Match[2]) : 1) : 0, "/user/" + User.Username + "/search?page=", function() {
+                        User.NRF.LastSearch = new Date().getTime();
+                        User.NRF.OverallProgress = NRF.OverallProgress.innerHTML;
+                        User.NRF.Results = NRF.Results.innerHTML;
+                        loadEndlessFeatures(NRF.Results);
+                        queueSave(NRF, function() {
+                            saveUser(User, NRF, function() {
+                                GM_setValue("LastSave", 0);
+                                Callback();
+                            });
+                        });
+                    });
+                } else {
+                    NRF.OverallProgress.innerHTML = User.NRF.OverallProgress;
+                    NRF.Results.innerHTML = User.NRF.Results;
+                    NRF.Popup.reposition();
                     loadEndlessFeatures(NRF.Results);
-                    queueSave(NRF, User, Callback);
-                });
-            } else {
-                NRF.OverallProgress.innerHTML = User.NRF.OverallProgress;
-                NRF.Results.innerHTML = User.NRF.Results;
-                NRF.Popup.reposition();
-                loadEndlessFeatures(NRF.Results);
-                Callback();
-            }
+                    Callback();
+                }
+            });
         });
     }
 
@@ -4425,7 +4494,8 @@
                 for (I = 0; I < N; ++I) {
                     UGS.Giveaways.push({
                         Name: Matches[I].closest(".table__row-inner-wrap").getElementsByClassName("table__column__heading")[0].textContent.match(/(.+?)( \(.+ Copies\))?$/)[1],
-                        URL: Matches[I].nextElementSibling.getAttribute("href")
+                        URL: Matches[I].nextElementSibling.getAttribute("href"),
+                        Context: Matches[I]
                     });
                 }
                 Pagination = Context.getElementsByClassName("pagination__navigation")[0];
@@ -4509,53 +4579,59 @@
                         User = {
                             Username: Keys[I]
                         };
-                        queueSave(UGS, User, function() {
-                            var SavedUser;
-                            SavedUser = getUser(User);
-                            if (SANM) {
-                                if (SW && SavedUser.Whitelisted) {
-                                    sendUGSGift(UGS, Winners, Keys, I, J, N, Callback);
-                                } else {
-                                    User.NAMWC = SavedUser.NAMWC;
-                                    updateNAMWCResults(User, UGS, function() {
-                                        if (!User.NAMWC) {
-                                            User.NAMWC = {
-                                                Results: {}
-                                            };
-                                        }
-                                        checkNAMWCNotActivated(UGS, User, function() {
-                                            checkNAMWCMultiple(UGS, User, function() {
-                                                queueSave(UGS, User, function() {
-                                                    if (User.NAMWC.Results.Activated && User.NAMWC.Results.NotMultiple) {
-                                                        sendUGSGift(UGS, Winners, Keys, I, J, N, Callback);
-                                                    } else {
-                                                        UGS.Checked.push(Keys[I] + UGS.Giveaways[J].Name);
-                                                        UGS.Unsent.classList.remove("rhHidden");
-                                                        UGS.UnsentCount.textContent = parseInt(UGS.UnsentCount.textContent) + 1;
-                                                        UGS.UnsentUsers.insertAdjacentHTML(
-                                                            "beforeEnd",
-                                                            "<span><a href=\"/user/" + Keys[I] + "\">" + Keys[I] + "</a> (<a href=\"" + UGS.Giveaways[J].URL + "\">" + UGS.Giveaways[J].Name +
-                                                            "</a>)</span>"
-                                                        );
-                                                        sendUGSGifts(UGS, ++I, N, J, Keys, Winners, Callback);
-                                                    }
+                        queueSave(UGS, function() {
+                            saveUser(User, UGS, function() {
+                                var SavedUser;
+                                GM_setValue("LastSave", 0);
+                                SavedUser = getUser(User);
+                                if (SANM) {
+                                    if (SW && SavedUser.Whitelisted) {
+                                        sendUGSGift(UGS, Winners, Keys, I, J, N, Callback);
+                                    } else {
+                                        User.NAMWC = SavedUser.NAMWC;
+                                        updateNAMWCResults(User, UGS, function() {
+                                            if (!User.NAMWC) {
+                                                User.NAMWC = {
+                                                    Results: {}
+                                                };
+                                            }
+                                            checkNAMWCNotActivated(UGS, User, function() {
+                                                checkNAMWCMultiple(UGS, User, function() {
+                                                    queueSave(UGS, function() {
+                                                        saveUser(User, UGS, function() {
+                                                            GM_setValue("LastSave", 0);
+                                                            if (User.NAMWC.Results.Activated && User.NAMWC.Results.NotMultiple) {
+                                                                sendUGSGift(UGS, Winners, Keys, I, J, N, Callback);
+                                                            } else {
+                                                                UGS.Checked.push(Keys[I] + UGS.Giveaways[J].Name);
+                                                                UGS.Unsent.classList.remove("rhHidden");
+                                                                UGS.UnsentCount.textContent = parseInt(UGS.UnsentCount.textContent) + 1;
+                                                                UGS.UnsentUsers.insertAdjacentHTML(
+                                                                    "beforeEnd",
+                                                                    "<span><a href=\"/user/" + Keys[I] + "\">" + Keys[I] + "</a> (<a href=\"" + UGS.Giveaways[J].URL + "\">" +
+                                                                    UGS.Giveaways[J].Name + "</a>)</span>"
+                                                                );
+                                                                sendUGSGifts(UGS, ++I, N, J, Keys, Winners, Callback);
+                                                            }
+                                                        });
+                                                    });
                                                 });
                                             });
                                         });
-                                    });
+                                    }
+                                } else if (SavedUser.Whitelisted) {
+                                    sendUGSGift(UGS, Winners, Keys, I, J, N, Callback);
+                                } else {
+                                    UGS.Checked.push(Keys[I] + UGS.Giveaways[J].Name);
+                                    UGS.Unsent.classList.remove("rhHidden");
+                                    UGS.UnsentCount.textContent = parseInt(UGS.UnsentCount.textContent) + 1;
+                                    UGS.UnsentUsers.insertAdjacentHTML(
+                                        "beforeEnd",
+                                        "<span><a href=\"/user/" + Keys[I] + "\">" + Keys[I] + "</a> (<a href=\"" + UGS.Giveaways[J].URL + "\">" + UGS.Giveaways[J].Name + "</a>)</span>"
+                                    );
+                                    sendUGSGifts(UGS, ++I, N, J, Keys, Winners, Callback);
                                 }
-                            } else if (SavedUser.Whitelisted) {
-                                sendUGSGift(UGS, Winners, Keys, I, J, N, Callback);
-                            } else {
-                                UGS.Checked.push(Keys[I] + UGS.Giveaways[J].Name);
-                                UGS.Unsent.classList.remove("rhHidden");
-                                UGS.UnsentCount.textContent = parseInt(UGS.UnsentCount.textContent) + 1;
-                                UGS.UnsentUsers.insertAdjacentHTML(
-                                    "beforeEnd",
-                                    "<span><a href=\"/user/" + Keys[I] + "\">" + Keys[I] + "</a> (<a href=\"" + UGS.Giveaways[J].URL + "\">" + UGS.Giveaways[J].Name + "</a>)</span>"
-                                );
-                                sendUGSGifts(UGS, ++I, N, J, Keys, Winners, Callback);
-                            }
+                            });
                         });
                     } else {
                         sendUGSGift(UGS, Winners, Keys, I, J, N, Callback);
@@ -4588,6 +4664,8 @@
                     "beforeEnd",
                     "<span><a href=\"/user/" + Keys[I] + "\">" + Keys[I] + "</a> (<a href=\"" + UGS.Giveaways[J].URL + "\">" + UGS.Giveaways[J].Name + "</a>)</span>"
                 );
+                UGS.Giveaways[J].Context.className = "fa fa-check-circle icon-green";
+                UGS.Giveaways[J].Context.nextElementSibling.textContent = "Sent";
                 sendUGSGifts(UGS, ++I, N, J, Keys, Winners, Callback);
             });
         }
@@ -4760,25 +4838,47 @@
 
     // Stickied Giveaway Groups
 
-    function setSGGGroups() {
-        var StickiedGroups, SGG, Matches, I, N, Context, ID;
+    function setSGGGroups(Matches) {
+        var StickiedGroups, SGG, Groups, I, NumMatches, Context, ID, Name, J, NumGroups;
         StickiedGroups = GM_getValue("StickiedGroups");
-        SGG = {
-            Container: document.getElementsByClassName("form__groups")[0]
-        };
-        SGG.Separator = SGG.Container.firstElementChild.nextElementSibling;
-        Matches = SGG.Container.getElementsByClassName("form__group--steam");
-        for (I = 0, N = Matches.length; I < N; ++I) {
-            Context = Matches[I];
-            ID = Context.getAttribute("data-group-id");
-            if (StickiedGroups.indexOf(ID) < 0) {
-                setSGGButton(Context, true, ID, SGG);
-            } else {
-                if (Context == SGG.Separator) {
-                    SGG.Separator = SGG.Separator.nextElementSibling;
+        if (Path.match(/\/giveaways\/new/)) {
+            SGG = {
+                Container: document.getElementsByClassName("form__groups")[0]
+            };
+            SGG.Separator = SGG.Container.firstElementChild.nextElementSibling;
+            Matches = SGG.Container.getElementsByClassName("form__group--steam");
+            Groups = GM_getValue("Groups");
+            for (I = 0, NumMatches = Matches.length; I < NumMatches; ++I) {
+                Context = Matches[I];
+                ID = Context.getAttribute("data-group-id");
+                Name = Context.getElementsByClassName("form__group__name")[0].textContent.substr(0, 22);
+                if (StickiedGroups.indexOf(ID) < 0) {
+                    setSGGButton(Context, true, ID, SGG);
+                } else {
+                    if (Context == SGG.Separator) {
+                        SGG.Separator = SGG.Separator.nextElementSibling;
+                    }
+                    SGG.Container.insertBefore(Context, SGG.Separator);
+                    setSGGButton(Context, false, ID, SGG);
                 }
-                SGG.Container.insertBefore(Context, SGG.Separator);
-                setSGGButton(Context, false, ID, SGG);
+                for (J = 0, NumGroups = Groups.length; (J < NumGroups) && (Groups[J].Name.substr(0, 22) != Name); ++J);
+                if ((J < NumGroups) && !Groups[J].ID) {
+                    Groups[J].ID = ID;
+                }
+            }
+            GM_setValue("Groups", Groups);
+        } else {
+            Groups = GM_getValue("Groups");
+            for (I = 0, NumMatches = Matches.length; I < NumMatches; ++I) {
+                Context = Matches[I];
+                Name = Context.getElementsByClassName("table__column__heading")[0].textContent;
+                for (J = 0, NumGroups = Groups.length; (J < NumGroups) && (Groups[J].Name != Name); ++J);
+                if (J < NumGroups) {
+                    ID = Groups[J].ID;
+                    if (ID) {
+                        setSGGButton(Context, StickiedGroups.indexOf(ID) < 0, ID);
+                    }
+                }
             }
         }
     }
@@ -4796,14 +4896,18 @@
             StickiedGroups = GM_getValue("StickiedGroups");
             if (Sticky) {
                 StickiedGroups.push(ID);
-                if (Context == SGG.Separator) {
-                    SGG.Separator = SGG.Separator.nextElementSibling;
+                if (SGG) {
+                    if (Context == SGG.Separator) {
+                        SGG.Separator = SGG.Separator.nextElementSibling;
+                    }
+                    SGG.Container.insertBefore(Context, SGG.Separator);
                 }
-                SGG.Container.insertBefore(Context, SGG.Separator);
             } else {
                 StickiedGroups.splice(StickiedGroups.indexOf(ID), 1);
-                SGG.Container.insertBefore(Context, SGG.Separator);
-                SGG.Separator = SGG.Separator.previousElementSibling;
+                if (SGG) {
+                    SGG.Container.insertBefore(Context, SGG.Separator);
+                    SGG.Separator = SGG.Separator.previousElementSibling;
+                }
             }
             GM_setValue("StickiedGroups", StickiedGroups);
             Event.currentTarget.remove();
@@ -4833,16 +4937,19 @@
             "https://www.dropbox.com/s/e8rwpy5gc39t3f2/9.ico?raw=1",
             "https://www.dropbox.com/s/8fm8m4lhwa1zy6r/0.ico?raw=1"
         ];
+        refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon, HIR, Background, Icons);
         Interval = setInterval(function() {
             refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon, HIR, Background, Icons);
         }, 60000);
-        if (!Background) {
-            window.addEventListener("focus", function() {
-                refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon, HIR, Background, Icons);
+        window.addEventListener("focus", function() {
+            refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon, HIR, Background, Icons);
+            if (!Background && !Interval) {
                 Interval = setInterval(function() {
                     refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon, HIR, Background, Icons);
                 }, 60000);
-            });
+            }
+        });
+        if (!Background) {
             window.addEventListener("blur", function() {
                 clearInterval(Interval);
             });
@@ -4852,14 +4959,29 @@
     function refreshHIRIcons(CreatedIcon, WonIcon, MessagesIcon, HIR, Background, Icons) {
         var Callback;
         Callback = function(Response) {
-            var Created, Won, Messages, Count;
-            Created = parseHTML(Response.responseText).getElementsByClassName("nav__right-container")[0].firstElementChild;
+            var ResponseHTML, Created, Won, Matches, I, N, Context, Messages, Count;
+            ResponseHTML = parseHTML(Response.responseText);
+            Created = ResponseHTML.getElementsByClassName("nav__right-container")[0].firstElementChild;
             Won = Created.nextElementSibling;
             Messages = Won.nextElementSibling;
             CreatedIcon.className = Created.className;
             CreatedIcon.innerHTML = Created.innerHTML;
             WonIcon.className = Won.className;
+            WonIcon.classList.add("HIRWon");
             WonIcon.innerHTML = Won.innerHTML;
+            Matches = ResponseHTML.getElementsByClassName("table__row-inner-wrap");
+            for (I = 0, N = Matches.length; I < N; ++I) {
+                Context = Matches[I].getElementsByClassName("table__column--gift-feedback")[0];
+                if (!Context.firstElementChild.nextElementSibling.classList.contains("is-hidden") && (Context.previousElementSibling.innerHTML.trim() != "-")) {
+                    WonIcon.firstElementChild.classList.add("giveaway__column--positive");
+                    GM_addStyle(
+                        ".HIRWon i {" +
+                        "    color: inherit !important;" +
+                        "}"
+                    );
+                    break;
+                }
+            }
             MessagesIcon.className = Messages.className;
             MessagesIcon.innerHTML = Messages.innerHTML;
             Count = MessagesIcon.getElementsByClassName("nav__notification")[0];
@@ -4878,9 +5000,9 @@
             }
         };
         if (Background) {
-            queueRequest({}, null, "/", Callback);
+            queueRequest({}, null, "/giveaways/won", Callback);
         } else {
-            makeRequest(null, "/", null, Callback);
+            makeRequest(null, "/giveaways/won", null, Callback);
         }
     }
 
@@ -4971,13 +5093,15 @@
             Interval = setInterval(function() {
                 refreshPRPoints(Points, PR, Title, Background);
             }, 60000);
-            if (!Background) {
-                window.addEventListener("focus", function() {
-                    refreshPRPoints(Points, PR, Title, Background);
+            window.addEventListener("focus", function() {
+                refreshPRPoints(Points, PR, Title, Background);
+                if (!Background && !Interval) {
                     Interval = setInterval(function() {
                         refreshPRPoints(Points, PR, Title, Background);
                     }, 60000);
-                });
+                }
+            });
+            if (!Background) {
                 window.addEventListener("blur", function() {
                     clearInterval(Interval);
                 });
@@ -5381,13 +5505,46 @@
         GM_setValue("Comments", Comments);
     }
 
+    function highlightDHDiscussion() {
+        var Comments, Key, Context, Container;
+        Comments = GM_getValue("Comments");
+        Key = Path.match(/\/discussion\/(.+?)\//)[1];
+        if (!Comments[Key]) {
+            Comments[Key] = {
+                Highlighted: false
+            };
+        }
+        Context = document.getElementsByClassName("page__heading")[0];
+        Container = Context.firstElementChild;
+        if (Comments[Key].Highlighted) {
+            Container.classList.add("DHHighlight");
+            Context.insertAdjacentHTML(
+                "afterBegin",
+                "<div>" +
+                "    <i class=\"fa fa-star DHIcon\" title=\"Unhighlight discussion.\"></i>" +
+                "</div>"
+            );
+        } else {
+            Context.insertAdjacentHTML(
+                "afterBegin",
+                "<div>" +
+                "    <i class=\"fa fa-star-o DHIcon\" title=\"Highlight discussion.\"></i>" +
+                "</div>"
+            );
+        }
+        setDHIcon(Context.firstElementChild.firstElementChild, Container, Key);
+        GM_setValue("Comments", Comments);
+    }
+
     function setDHIcon(DHIcon, Context, Key) {
         DHIcon.addEventListener("click", function() {
             var Comments;
             DHIcon.classList.toggle("fa-star");
             DHIcon.classList.toggle("fa-star-o");
-            DHIcon.title = DHIcon.classList.contains("fa-star") ? "Highlight discussion." : "Unhighlight discussion.";
-            Context.classList.toggle("DHHighlight");
+            DHIcon.title = DHIcon.classList.contains("fa-star") ? "Unhighlight discussion." : "Highlight discussion.";
+            if (Context) {
+                Context.classList.toggle("DHHighlight");
+            }
             Comments = GM_getValue("Comments");
             Comments[Key].Highlighted = Comments[Key].Highlighted ? false : true;
             GM_setValue("Comments", Comments);
@@ -13577,7 +13734,7 @@
             Visited = GM_getValue("Comments" + (SG ? "" : "_ST"))[Path.match(/^\/(giveaway(?!.+(entries|winners))|discussion|support\/ticket|trade)\/(.+?)\//)[3]];
             Timestamp = MPPPost.querySelectorAll("[data-timestamp]");
             Timestamp = parseInt(Timestamp[Timestamp.length - 1].getAttribute("data-timestamp"));
-            Hidden = Visited ? ((Visited[""] == Timestamp) ? true : false) : false;
+            Hidden = Visited ? (((Visited[""] == Timestamp) || (GM_getValue("MPP_FV") && Visited.Visited)) ? true : false) : false;
         } else {
             Hidden = true;
         }
@@ -14132,10 +14289,12 @@
             "    margin: 0 0 0 5px;" +
             "}" +
             ".SGGSticky {" +
+            "    cursor: pointer;" +
             "    margin: 0 5px 0 0;" +
             "    opacity: 0.5;" +
             "}" +
             ".SGGUnsticky {" +
+            "    cursor: pointer;" +
             "    margin: 0 5px 0 0;" +
             "}" +
             ".AGSPanel {" +
@@ -14201,6 +14360,9 @@
             ".DHIcon {" +
             "    cursor: pointer;" +
             "    margin: 0 5px 0 0;" +
+            "}" +
+            ".page__heading .DHIcon {" +
+            "    margin: 0;" +
             "}" +
             ".comment__actions .CTButton {" +
             "    margin: 0 0 0 10px;" +

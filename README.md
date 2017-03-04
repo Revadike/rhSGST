@@ -23,11 +23,13 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 
 * [Settings Menu](#settings-menu)
 * [Featured Container Hider](#featured-container-hider)
+* [Blacklist Stats Hider](#blacklist-stats-hider)
 * [Fixed Elements](#fixed-elements)
 * [Endless Scrolling](#endless-scrolling)
 * [Grid View](#grid-view)
 * [SteamGifts Profile Button](#steamgifts-profile-button)
 * [SteamTrades Profile Button](#steamtrades-profile-button)
+* [Shared Groups Checker](#shared-groups-checker)
 * [Comment History](#comment-history)
 * [Username History](#username-history)
 * [Permanent User Notes](#permanent-user-notes)
@@ -305,6 +307,9 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 
 * Updates the header icons every 60 seconds (only if the tab is active).
 * You can enable an option that runs the refresher in the background and changes the icon of the tab when not active.
+* This feature also notifies you if one of your won gifts has been delivered:
+
+![](http://i.imgur.com/BDTqCPU.png)
 
 ### Advanced Giveaway Search
 
