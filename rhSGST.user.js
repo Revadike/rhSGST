@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.15.2
+// @version 4.15.3
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -398,6 +398,7 @@
 
     function loadFeatures() {
         var CommentBox;
+        addHMMenu();
         if (GM_getValue("FCH") && Path.match(/^\/($|giveaways(?!\/(wishlist|created|entered|won|new)))/)) {
             hideFCHContainer();
         } else if (GM_getValue("BSH") && Path.match(/^\/stats\/personal\/community/)) {
@@ -1488,6 +1489,95 @@
         );
     }
 
+    // Header Menu
+
+    function addHMMenu() {
+        var Context, HMBox, SMRecentUsernameChanges, SMCommentHistory, HMButton;
+        Context = document.getElementsByClassName("nav__left-container")[0];
+        Context.insertAdjacentHTML(
+            "beforeEnd",
+            "<div class=\"nav__button-container\">" +
+            "    <div class=\"HMBox rhHidden\">" +
+            "        <div class=\"nav__absolute-dropdown\">" +
+            createHMItems([{
+                Check: true,
+                URL: "https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js",
+                Icon: "fa-refresh icon-blue",
+                Title: "Update",
+                Description: "Check for updates."
+            }, {
+                Check: true,
+                URL: "https://github.com/revilheart/rhSGST",
+                Target: true,
+                Icon: "fa-github icon-grey",
+                Title: "GitHub",
+                Description: "Visit the GitHub page."
+            }, {
+                Check: true,
+                URL: "/discussion/TDyzv/",
+                Icon: "fa-commenting icon-green",
+                Title: "Discussion",
+                Description: "Visit the discussion page."
+            }, {
+                Check: GM_getValue("UH"),
+                Name: "SMRecentUsernameChanges",
+                Icon: "fa-user icon-red",
+                Title: "Recent Username Changes",
+                Description: "Check out the recent username changes."
+            }, {
+                Check: GM_getValue("CH"),
+                Name: "SMCommentHistory",
+                Icon: "fa-comments icon-yellow",
+                Title: "Comment History",
+                Description: "Check out your comment history."
+            }]) +
+            "        </div>" +
+            "    </div>" +
+            "    <a class=\"nav__button nav__button--is-dropdown\" href=\"/account#rhSGST\">rhSGST</a>" +
+            "    <div class=\"nav__button nav__button--is-dropdown-arrow HMButton\">" +
+            "        <i class=\"fa fa-angle-down\"></i>" +
+            "    </div>" +
+            "</div>"
+        );
+        HMBox = Context.getElementsByClassName("HMBox")[0];
+        SMRecentUsernameChanges = Context.getElementsByClassName("SMRecentUsernameChanges")[0];
+        SMCommentHistory = Context.getElementsByClassName("SMCommentHistory")[0];
+        HMButton = Context.getElementsByClassName("HMButton")[0];
+        if (SMRecentUsernameChanges) {
+            setSMRecentUsernameChanges(SMRecentUsernameChanges);
+        }
+        if (SMCommentHistory) {
+            setSMCommentHistory(SMCommentHistory);
+        }
+        HMButton.addEventListener("click", function() {
+            HMBox.classList.toggle("rhHidden");
+        });
+        document.addEventListener("click", function(Event) {
+            if (!HMBox.classList.contains("rhHidden") && !HMBox.contains(Event.target) && !HMButton.contains(Event.target)) {
+                HMBox.classList.add("rhHidden");
+            }
+        });
+    }
+
+    function createHMItems(Items) {
+        var HTML, I, N;
+        HTML = "";
+        for (I = 0, N = Items.length; I < N; ++I) {
+            if (Items[I].Check) {
+                HTML +=
+                    "<a class=\"nav__row" + (Items[I].Name ? (" " + Items[I].Name) : "") + "\"" + (Items[I].URL ? (" href=\"" + Items[I].URL + "\"") : "") +
+                    (Items[I].Target ? " target=\"_blank\"" : "") + ">" +
+                    "    <i class=\"fa fa-fw " + Items[I].Icon + "\"></i>" +
+                    "    <div class=\"nav__row__summary\">" +
+                    "        <p class=\"nav__row__summary__name\">" + Items[I].Title + "</p>" +
+                    "        <p class=\"nav__row__summary__description\">" + Items[I].Description + "</p>" +
+                    "    </div>" +
+                    "</a>";
+            }
+        }
+        return HTML;
+    }
+
     // Settings Menu
 
     function addSMButton() {
@@ -1845,46 +1935,10 @@
             });
         }
         if (SMRecentUsernameChanges) {
-            SMRecentUsernameChanges.addEventListener("click", function() {
-                var Popup, SMRecentUsernameChangesPopup;
-                Popup = createPopup(true);
-                Popup.Results.classList.add("SMRecentUsernameChangesPopup");
-                Popup.Icon.classList.add("fa-comments");
-                Popup.Title.textContent = "Recent Username Changes";
-                Popup.Progress.innerHTML =
-                    "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
-                    "<span>Loading recent username changes...</span>";
-                makeRequest(null, "https://script.google.com/macros/s/AKfycbzvOuHG913mRIXOsqHIeAuQUkLYyxTHOZim5n8iP-k80iza6g0/exec?Action=2", Popup.Progress, function(Response) {
-                    var RecentChanges, HTML, N;
-                    Popup.Progress.innerHTML = "";
-                    RecentChanges = parseJSON(Response.responseText).RecentChanges;
-                    HTML = "";
-                    for (I = 0, N = RecentChanges.length; I < N; ++I) {
-                        HTML += "<div>" + RecentChanges[I][0] + " changed to <a class=\"rhBold\" href=\"/user/" + RecentChanges[I][1] + "\">" + RecentChanges[I][1] + "</a></div>";
-                    }
-                    Popup.Results.innerHTML = HTML;
-                    loadEndlessFeatures(Popup.Results);
-                    SMRecentUsernameChangesPopup.reposition();
-                });
-                SMRecentUsernameChangesPopup = Popup.popUp();
-            });
+            setSMRecentUsernameChanges(SMRecentUsernameChanges);
         }
         if (SMCommentHistory) {
-            SMCommentHistory.addEventListener("click", function() {
-                var Popup;
-                Popup = createPopup(true);
-                Popup.Popup.style.width = "600px";
-                Popup.Icon.classList.add("fa-comments");
-                Popup.Title.textContent = "Comment History";
-                Popup.Results.classList.add("SMComments");
-                Popup.Results.innerHTML = GM_getValue("CommentHistory");
-                loadMatchesFeatures(Popup.Results, [{
-                    Check: true,
-                    Query: "[data-timestamp]",
-                    Callback: setATTimestamp
-                }]);
-                Popup.popUp();
-            });
+            setSMCommentHistory(SMCommentHistory);
         }
     }
 
@@ -2051,6 +2105,50 @@
                 deleteSMSettings(Key, Feature[Key]);
             }
         }
+    }
+
+    function setSMRecentUsernameChanges(SMRecentUsernameChanges) {
+        SMRecentUsernameChanges.addEventListener("click", function() {
+            var Popup, SMRecentUsernameChangesPopup;
+            Popup = createPopup(true);
+            Popup.Results.classList.add("SMRecentUsernameChangesPopup");
+            Popup.Icon.classList.add("fa-comments");
+            Popup.Title.textContent = "Recent Username Changes";
+            Popup.Progress.innerHTML =
+                "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
+                "<span>Loading recent username changes...</span>";
+            makeRequest(null, "https://script.google.com/macros/s/AKfycbzvOuHG913mRIXOsqHIeAuQUkLYyxTHOZim5n8iP-k80iza6g0/exec?Action=2", Popup.Progress, function(Response) {
+                var RecentChanges, HTML, I, N;
+                Popup.Progress.innerHTML = "";
+                RecentChanges = parseJSON(Response.responseText).RecentChanges;
+                HTML = "";
+                for (I = 0, N = RecentChanges.length; I < N; ++I) {
+                    HTML += "<div>" + RecentChanges[I][0] + " changed to <a class=\"rhBold\" href=\"/user/" + RecentChanges[I][1] + "\">" + RecentChanges[I][1] + "</a></div>";
+                }
+                Popup.Results.innerHTML = HTML;
+                loadEndlessFeatures(Popup.Results);
+                SMRecentUsernameChangesPopup.reposition();
+            });
+            SMRecentUsernameChangesPopup = Popup.popUp();
+        });
+    }
+
+    function setSMCommentHistory(SMCommentHistory) {
+        SMCommentHistory.addEventListener("click", function() {
+            var Popup;
+            Popup = createPopup(true);
+            Popup.Popup.style.width = "600px";
+            Popup.Icon.classList.add("fa-comments");
+            Popup.Title.textContent = "Comment History";
+            Popup.Results.classList.add("SMComments");
+            Popup.Results.innerHTML = GM_getValue("CommentHistory");
+            loadMatchesFeatures(Popup.Results, [{
+                Check: true,
+                Query: "[data-timestamp]",
+                Callback: setATTimestamp
+            }]);
+            Popup.popUp();
+        });
     }
 
     // Featured Container Hider
@@ -14074,12 +14172,18 @@
             ".SMManageDataPopup, .SMImport, .SMExport, .SMDelete, .SMTag {" +
             "    display: block;" +
             "}" +
+            ".nav__row.SMRecentUsernameChanges, .nav__row.SMCommentHistory {" +
+            "    display: flex;" +
+            "}" +
             ".SMRecentUsernameChangesPopup a, .SMComments a {" +
             "    border-bottom: 1px dotted;" +
             "}" +
             ".SMSyncFrequency {" +
             "    display: block;" +
             "    width: 200px;" +
+            "}" +
+            ".HMBox {" +
+            "    position: relative;" +
             "}" +
             ".FEHeader {" +
             "    height: auto !important;" +
