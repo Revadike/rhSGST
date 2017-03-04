@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.15.6
+// @version 4.16
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -236,15 +236,18 @@
                 Name: "Reverse order (from new to old)."
             }
         },
+        SWR: {
+            Name: "Sent / Won Ratio"
+        },
         SGPB: {
             Name: "SteamGifts Profile Button"
         },
         STPB: {
             Name: "SteamTrades Profile Button"
         },
-		SGC: {
-			Name: "Shared Groups Checker"
-		},
+        SGC: {
+            Name: "Shared Groups Checker"
+        },
         PUT: {
             Name: "Permanent User Tags"
         },
@@ -312,7 +315,7 @@
         };
     }
     setDefaultValues();
-	updateGroups();
+    updateGroups();
     addStyles();
     loadFeatures();
     if (SG) {
@@ -330,7 +333,7 @@
 
     // Helper Functions
 
-	function setDefaultValues() {
+    function setDefaultValues() {
         var DefaultValues, rhSGST, Key;
         DefaultValues = {
             Avatar: "",
@@ -381,21 +384,21 @@
         }
     }
 
-	function updateGroups() {
-		var Popup;
-		if (!GM_getValue("GSync")) {
-			Popup = createPopup(true);
-			Popup.Icon.classList.add("fa-refresh", "fa-spin");
-			Popup.Title.textContent = "rhSGST is updating your groups. Please wait...";
+    function updateGroups() {
+        var Popup;
+        if (!GM_getValue("GSync")) {
+            Popup = createPopup(true);
+            Popup.Icon.classList.add("fa-refresh", "fa-spin");
+            Popup.Title.textContent = "rhSGST is updating your groups. Please wait...";
             Popup.Groups = [];
-			syncGroups(Popup, "/account/steam/groups/search?page=", 1, function(Groups) {
-				GM_setValue("GSync", true);
-				GM_setValue("Groups", Popup.Groups);
-				Popup.Title.textContent = "Done. You can close this now.";
-			});
-			Popup.popUp();
-		}
-	}
+            syncGroups(Popup, "/account/steam/groups/search?page=", 1, function(Groups) {
+                GM_setValue("GSync", true);
+                GM_setValue("Groups", Popup.Groups);
+                Popup.Title.textContent = "Done. You can close this now.";
+            });
+            Popup.popUp();
+        }
+    }
 
     function loadFeatures() {
         var CommentBox;
@@ -473,6 +476,9 @@
             if (GM_getValue("UH")) {
                 addUHContainer(Heading, SteamID64, Username);
             }
+            if (GM_getValue("SWR")) {
+                addSWRRatio(Context, Username);
+            }
             if (GM_getValue("RWSCVL")) {
                 addRWSCVLLinks(Context, Username);
             }
@@ -488,9 +494,9 @@
         if (GM_getValue("PUN")) {
             addPUNButton(Heading, Username, ID, SteamID64);
         }
-		if (GM_getValue("SGC")) {
-			addSGCContainer(Context, SteamID64);
-		}
+        if (GM_getValue("SGC") && (Username != GM_getValue("Username"))) {
+            addSGCContainer(Context, SteamID64);
+        }
     }
 
     function loadEndlessFeatures(Context) {
@@ -524,7 +530,7 @@
             if (SteamLink) {
                 Game = SteamLink.getAttribute("href").match(/\d+/)[0];
                 Title = Match.firstElementChild.textContent;
-            } else if (!Match.classList.contains("giveaway__heading")) {
+            } else if (!Match.classList.contains("giveaway__heading") && !Path.match(/^\/giveaway\//)) {
                 Title = Match.textContent;
                 Game = Match.closest(".table__row-outer-wrap").getElementsByClassName("global__image-inner-wrap")[0];
                 if (Game) {
@@ -1717,7 +1723,7 @@
         SMGiveawayFeatures = ["GTS", "SGG", "AGS", "EGF", "ELGB", "GDCBP", "GWC", "GGP", "GWL", "UGS"];
         SMDiscussionFeatures = ["DH", "MPP", "DED"];
         SMCommentingFeatures = ["CH", "CT", "CFH", "MCBP", "MR", "RFI", "RML"];
-        SMUserFeatures = ["UH", "PUN", "RWSCVL", "SGPB", "STPB", "SGC", "PUT", "WBH", "WBC", "NAMWC", "NRF", "AP"];
+        SMUserFeatures = ["UH", "PUN", "RWSCVL", "SWR", "SGPB", "STPB", "SGC", "PUT", "WBH", "WBC", "NAMWC", "NRF", "AP"];
         SMGameFeatures = ["EGH", "GT"];
         SMOtherFeatures = ["FCH", "BSH", "MT", "GH", "AS", "SM_D"];
         for (ID in Features) {
@@ -3921,6 +3927,31 @@
                     "\" target=\"_blank\">" + Match[0] + "</a>";
             }
         }
+    }
+
+    // SWR - Sent / Won Ratio
+
+    function addSWRRatio(Context, Username) {
+        var Matches, I, N, Won, Sent, Ratio;
+        Matches = Context.getElementsByClassName("featured__table__row__left");
+        for (I = 0, N = Matches.length; I < N; ++I) {
+            if (Matches[I].textContent.match(/Gifts Won/)) {
+                Won = Matches[I].parentElement;
+                Sent = Won.nextElementSibling;
+                Context = Sent;
+                break;
+            }
+        }
+        Won = parseInt(Won.lastElementChild.firstElementChild.textContent.replace(/,/, ""));
+        Sent = parseInt(Sent.lastElementChild.firstElementChild.firstElementChild.textContent.replace(/,/, ""));
+        Ratio = (Won > 0) ? (Math.round(Sent / Won * 100) / 100) : 0;
+        Context.insertAdjacentHTML(
+            "afterEnd",
+            "<div class=\"featured__table__row SWRRatio\">" +
+            "    <div class=\"featured__table__row__left\">Ratio</div>" +
+            "    <div class=\"featured__table__row__right\" title=\"" + Username + " has sent " + Ratio + " gifts for every gift won.\">" + Ratio + "</div>" +
+            "</div>"
+        );
     }
 
     // Not Activated / Multiple Wins Checker

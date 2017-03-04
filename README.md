@@ -66,6 +66,7 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 * [Username History](#username-history)
 * [Permanent User Notes](#permanent-user-notes)
 * [Real Won / Sent CV Links](#real-won--sent-cv-links)
+* [Sent / Won Ratio](#sent--won-ratio)
 * [SteamGifts Profile Button](#steamgifts-profile-button)
 * [SteamTrades Profile Button](#steamtrades-profile-button)
 * [Shared Groups Checker](#shared-groups-checker)
@@ -258,6 +259,14 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 ![](http://i.imgur.com/Shwsgdh.png)
 
 * Adds links to an user's SGTools real won / sent CV pages.
+
+### Sent / Won Ratio
+
+`steamgifts.com/user/*`
+
+![](http://i.imgur.com/eqBybQQ.png)
+
+* Shows the sent / won ratio of an user.
 
 ### Not Activated / Multiple Wins Checker
 
