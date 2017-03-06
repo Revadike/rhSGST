@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.16.1
+// @version 4.17
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -272,6 +272,9 @@
         NRF: {
             Name: "Not Received Finder"
         },
+        IWH: {
+            Name: "Inbox Winners Highlighter"
+        },
         AP: {
             Name: "Avatar Popout"
         },
@@ -352,7 +355,8 @@
             Rerolls: [],
             CommentHistory: "",
             StickiedGroups: [],
-            Templates: []
+            Templates: [],
+            Winners: {}
         };
         rhSGST = GM_getValue("rhSGST");
         for (Key in DefaultValues) {
@@ -628,6 +632,14 @@
             Query: ".table__row-inner-wrap",
             Callback: setSGGGroups,
             All: true
+        }, {
+            Check: GM_getValue("IWH") && Path.match(/^\/giveaway\/.+\/winners/),
+            Query: ".table__gift-not-sent",
+            Callback: setIWHObserver
+        }, {
+            Check: GM_getValue("IWH") && Path.match(/^\/messages/),
+            Query: ".comments__entity",
+            Callback: highlightIWHWinner
         }, {
             Check: GM_getValue("AP"),
             Query: ".global__image-outer-wrap--avatar-small",
@@ -1739,7 +1751,7 @@
         SMGiveawayFeatures = ["GTS", "SGG", "AGS", "EGF", "ELGB", "GDCBP", "GWC", "GGP", "GWL", "UGS"];
         SMDiscussionFeatures = ["DH", "MPP", "DED"];
         SMCommentingFeatures = ["CH", "CT", "CFH", "MCBP", "MR", "RFI", "RML"];
-        SMUserFeatures = ["UH", "PUN", "RWSCVL", "SWR", "SGPB", "STPB", "SGC", "PUT", "WBH", "WBC", "NAMWC", "NRF", "AP"];
+        SMUserFeatures = ["UH", "PUN", "RWSCVL", "SWR", "SGPB", "STPB", "SGC", "PUT", "WBH", "WBC", "NAMWC", "NRF", "IWH", "AP"];
         SMGameFeatures = ["EGH", "GT"];
         SMOtherFeatures = ["FCH", "BSH", "MT", "GH", "AS", "SM_D"];
         for (ID in Features) {
@@ -4507,6 +4519,44 @@
         }
     }
 
+    // Inbox Winners Highlighter
+
+    function setIWHObserver(Context) {
+        var Key, Username;
+        Key = Path.match(/\/giveaway\/(.+?)\//)[1];
+        Username = Context.closest(".table__row-inner-wrap").getElementsByClassName("table__column__heading")[0].querySelector("a[href*='/user/']").textContent;
+        Context.addEventListener("click", function() {
+            var Winners;
+            Winners = GM_getValue("Winners");
+            if (!Winners[Key]) {
+                Winners[Key] = [];
+            }
+            if (Winners[Key].indexOf(Username) < 0) {
+                Winners[Key].push(Username);
+            }
+            GM_setValue("Winners", Winners);
+        });
+    }
+
+    function highlightIWHWinner(Context) {
+        var Match, Key, Winners, Matches, I, N, Username;
+        Match = Context.firstElementChild.firstElementChild.getAttribute("href").match(/\/giveaway\/(.+?)\//);
+        if (Match) {
+            Key = Match[1];
+            Winners = GM_getValue("Winners");
+            if (Winners[Key]) {
+                Matches = Context.nextElementSibling.children;
+                for (I = 0, N = Matches.length; I < N; ++I) {
+                    Context = Matches[I].getElementsByClassName("comment__username")[0];
+                    Username = Context.textContent;
+                    if (Winners[Key].indexOf(Username) >= 0) {
+                        Context.insertAdjacentHTML("afterEnd", "<i class=\"fa fa-trophy IWHIcon\" title=\"This is the winner or one of the winners of this giveaway.\"></i>");
+                    }
+                }
+            }
+        }
+    }
+
     // AP - Avatar Popout
 
     function addAPContainer(APAvatar) {
@@ -4643,6 +4693,7 @@
             UGS.Canceled = false;
             UGS.Giveaways = [];
             UGS.Checked = [];
+            UGS.Winners = GM_getValue("Winners");
             Match = Location.match(/page=(\d+)/);
             getUGSGiveaways(UGS, 1, Match ? parseInt(Match[1]) : 1, function() {
                 var N;
@@ -4651,6 +4702,7 @@
                     getUGSWinners(UGS, 0, N, function() {
                         UGSButton.classList.remove("rhBusy");
                         UGS.Progress.innerHTML = UGS.OverallProgress.innerHTML = "";
+                        GM_setValue("Winners", UGS.Winners);
                         Callback();
                     });
                 } else {
@@ -4859,6 +4911,7 @@
     function sendUGSGift(UGS, Winners, Keys, I, J, N, Callback) {
         if (!UGS.Canceled) {
             queueRequest(UGS, "xsrf_token=" + XSRFToken + "&do=sent_feedback&action=1&winner_id=" + Winners[Keys[I]], "/ajax.php", function(Response) {
+                var Key;
                 UGS.Checked.push(Keys[I] + UGS.Giveaways[J].Name);
                 UGS.Sent.classList.remove("rhHidden");
                 UGS.SentCount.textContent = parseInt(UGS.SentCount.textContent) + 1;
@@ -4868,6 +4921,13 @@
                 );
                 UGS.Giveaways[J].Context.className = "fa fa-check-circle icon-green";
                 UGS.Giveaways[J].Context.nextElementSibling.textContent = "Sent";
+                Key = UGS.Giveaways[J].URL.match(/\/giveaway\/(.+?)\//)[1];
+                if (!UGS.Winners[Key]) {
+                    UGS.Winners[Key] = [];
+                }
+                if (UGS.Winners[Key].indexOf(Keys[I]) < 0) {
+                    UGS.Winners[Key].push(Keys[I]);
+                }
                 sendUGSGifts(UGS, ++I, N, J, Keys, Winners, Callback);
             });
         }
@@ -14350,12 +14410,16 @@
             ".GVView {" +
             "    text-align: center;" +
             "}" +
+            ".pinned-giveaways__inner-wrap--minimized.GVView .giveaway__row-outer-wrap:nth-child(-n+8) {" +
+            "    display: inline-block;" +
+            "}"+
             ".GVContainer {" +
             "    border: 0 !important;" +
             "    box-shadow: none !important;" +
             "    display: inline-block;" +
             "    margin: 5px;" +
             "    padding: 0;" +
+            "    vertical-align: top;" +
             "}" +
             ".GVContainer .giveaway__columns:not(.GPPanel) {" +
             "    display: block;" +
@@ -14476,6 +14540,9 @@
             ".NAMWCUnknown {" +
             "    color: " + Unknown + " !important;" +
             "    font-weight: bold;" +
+            "}" +
+            ".IWHIcon {" +
+            "    margin: 0 0 0 5px;" +
             "}" +
             ".APBox .featured__outer-wrap {" +
             "    padding: 5px;" +

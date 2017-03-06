@@ -75,6 +75,7 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 * [Whitelist / Blacklist Checker](#whitelist--blacklist-checker)
 * [Not Activated / Multiple Wins Checker](#not-activated--multiple-wins-checker)
 * [Not Received Finder](#not-received-finder)
+* [Inbox Winners Highlighter](#inbox-winners-highlighter)
 * [Avatar Popout](#avatar-popout)
 
 ## Games
@@ -294,6 +295,15 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 * Allows you to find an user's not received giveaways.
 * If the user doesn't have any not received giveaways, the button will not appear.
 * Results are cached for 7 days.
+
+### Inbox Winners Highlighter
+
+`steamgifts.com/messages`
+
+![](http://i.imgur.com/l5IeKoHg.png)
+
+* Highlights the winners of your giveaways in your inbox.
+* A winner is added to the storage when you send the gift to them through the winners page of the giveaway or through Unsent Gifts Sender.
 
 ### Avatar Popout
 
