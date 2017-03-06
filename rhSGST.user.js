@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.16
+// @version 4.16.1
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -402,7 +402,9 @@
 
     function loadFeatures() {
         var CommentBox;
-        addHMMenu();
+        if (SG) {
+            addHMMenu();
+        }
         if (GM_getValue("FCH") && Path.match(/^\/($|giveaways(?!\/(wishlist|created|entered|won|new)))/)) {
             hideFCHContainer();
         } else if (GM_getValue("BSH") && Path.match(/^\/stats\/personal\/community/)) {
@@ -744,14 +746,15 @@
     }
 
     function queueRequest(Element, Data, URL, Callback) {
-        var CurrentDate;
+        var CurrentDate, HTML;
+        HTML = Element.Progress ? Element.Progress.innerHTML : "";
         Element.Request = setInterval(function() {
             CurrentDate = new Date().getTime();
             if ((CurrentDate - GM_getValue("LastRequest")) > 5000) {
                 clearInterval(Element.Request);
                 GM_setValue("LastRequest", CurrentDate);
                 if (Element.Progress) {
-                    Element.Progress.innerHTML = "";
+                    Element.Progress.innerHTML = HTML;
                 }
                 makeRequest(Data, URL, Element.Progress, function(Response) {
                     GM_setValue("LastRequest", 0);
@@ -1196,12 +1199,25 @@
     }
 
     function formatDate(EntryDate) {
-        var Hours, Minutes;
+        var Months, Hours, Minutes, OutputDate, Suffix;
+        Months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
         Hours = EntryDate.getHours();
         Minutes = EntryDate.getMinutes();
         Minutes = (Minutes > 9) ? Minutes : ("0" + Minutes);
-        return (["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][EntryDate.getMonth()] + " " + EntryDate.getDate() + ", " + EntryDate.getFullYear() + " " +
-                ((Hours > 12) ? ((Hours - 12) + ":" + Minutes + " pm") : ((!Hours ? 12 : Hours) + ":" + Minutes + " am")));
+        OutputDate = Months[EntryDate.getMonth()] + " " + EntryDate.getDate() + ", " + EntryDate.getFullYear() + " ";
+        if (Hours >= 12) {
+            if (Hours > 12) {
+                Hours -= 12;
+            }
+            Suffix = "pm";
+        } else {
+            if (Hours === 0) {
+                Hours = 12;
+            }
+            Suffix = "am";
+        }
+        OutputDate += Hours + ":" + Minutes + " " + Suffix;
+        return OutputDate;
     }
 
     function createPopup(Temp) {
@@ -4271,8 +4287,14 @@
     function highlightNAMWCUser(User, Matches) {
         var Name, Title, I, N;
         if (User.NAMWC && User.NAMWC.Results) {
-            Name = (User.NAMWC.Results.None || (User.NAMWC.Results.Activated && User.NAMWC.Results.NotMultiple)) ? "NAMWCPositive" : "NAMWCNegative";
-            Title = User.Username + " has " + User.NAMWC.Results.NotActivated + " not activated wins and " + User.NAMWC.Results.Multiple + " multiple wins.";
+            if (User.NAMWC.Results.None || (User.NAMWC.Results.Activated && User.NAMWC.Results.NotMultiple)) {
+                Name = "NAMWCPositive";
+            } else if (User.NAMWC.Results.Unknown) {
+                Name = "NAMWCUnknown";
+            } else {
+                Name = "NAMWCNegative"
+            };
+            Title = User.Username + " has " + (User.NAMWC.Results.Unknown ? "?" : User.NAMWC.Results.NotActivated) + " not activated wins and " + User.NAMWC.Results.Multiple + " multiple wins.";
             for (I = 0, N = Matches.length; I < N; ++I) {
                 Matches[I].classList.add(Name);
                 Matches[I].title = Title;
@@ -5381,68 +5403,70 @@
             GP = {};
             GP.URL = Heading.getAttribute("href");
             if (GP.URL) {
-                GPLinks = Context.getElementsByClassName("giveaway__links")[0];
-                GPLinks.classList.add("GPLinks");
-                GPLinks.insertAdjacentHTML("afterEnd", "<div class=\"giveaway__columns GPPanel\"></div>");
-                GP.Entries = GPLinks.firstElementChild.lastElementChild;
-                GPPanel = GPLinks.nextElementSibling;
-                while (!Columns.lastElementChild.classList.contains("giveaway__column--width-fill")) {
-                    GPPanel.insertBefore(Columns.lastElementChild, GPPanel.firstElementChild);
-                }
-                GPPanel.insertAdjacentHTML(
-                    "beforeEnd",
-                    "<div " + (GM_getValue("GWC") ? "" : "class=\"rhHidden\" ") + "title=\"Giveaway Winning Chance\">" +
-                    "    <i class=\"fa fa-line-chart\"></i>" +
-                    "    <span class=\"GWCChance\"></span>" +
-                    "</div>" +
-                    "<a class=\"GDCBPButton" + (GM_getValue("GDCBP") ? "" : " rhHidden") + "\" title=\"Read giveaway description / add a comment to the giveaway.\">" +
-                    "    <i class=\"fa fa-file-text\"></i>" +
-                    "    <i class=\"fa fa-comment\"></i>" +
-                    "</a>" +
-                    "<div class=\"ELGBButton" + (GM_getValue("ELGB") ? "" : " rhHidden") + "\"></div>" +
-                    "<div class=\"rhHidden\">" +
-                    "    <div class=\"sidebar__error is-disabled\">" +
-                    "        <i class=\"fa fa-exclamation-circle\"></i> " +
-                    "        <span>Not Enough Points</span>" +
-                    "    </div>" +
-                    "</div>"
-                );
-                GP.ELGBButton = GPPanel.lastElementChild.previousElementSibling;
-                GP.GDCBPButton = GP.ELGBButton.previousElementSibling;
-                GP.GWCChance = GP.GDCBPButton.previousElementSibling.lastElementChild;
                 GP.Title = Heading.textContent;
-                GP.Code = GP.URL.match(/\/giveaway\/(.+?)\//)[1];
-                Matches = Heading.parentElement.getElementsByClassName("giveaway__heading__thin");
-                Match = Matches[0].textContent.match(/\((.+) Copies\)/);
-                if (Match) {
-                    GP.Copies = parseInt(Match[1]);
-                    I = 1;
-                } else {
-                    GP.Copies = 1;
-                    I = 0;
-                }
-                EntryPoints = parseInt(Matches[I].textContent.match(/\d+/)[0]);
-                GP.ELGBButton.setAttribute("data-points", EntryPoints);
-                GP.Username = Path.match(/^\/user\//) ?
-                    document.getElementsByClassName("featured__heading__medium")[0].textContent : Context.getElementsByClassName("giveaway__username")[0].textContent;
-                GP.Points = document.getElementsByClassName("nav__points")[0];
-                if (GM_getValue("ELGB")) {
-                    if (Context.classList.contains("is-faded")) {
-                        Context.classList.remove("is-faded");
-                        Context.classList.add("rhFaded");
-                        GP.ELGBButton.setAttribute("data-entered", true);
-                        setELGBButton(GP, "fa-minus-circle", "Leave", "Leaving...", "entry_delete", Context, true);
-                    } else {
-                        if (EntryPoints > parseInt(GP.Points.textContent)) {
-                            GP.ELGBButton.nextElementSibling.classList.remove("rhHidden");
-                        }
-                        setELGBButton(GP, "fa-plus-circle", "Enter", "Entering...", "entry_insert", Context);
+                if (!GP.Title.match(/^Invite Only$/)) {
+                    GPLinks = Context.getElementsByClassName("giveaway__links")[0];
+                    GPLinks.classList.add("GPLinks");
+                    GPLinks.insertAdjacentHTML("afterEnd", "<div class=\"giveaway__columns GPPanel\"></div>");
+                    GP.Entries = GPLinks.firstElementChild.lastElementChild;
+                    GPPanel = GPLinks.nextElementSibling;
+                    while (!Columns.lastElementChild.classList.contains("giveaway__column--width-fill")) {
+                        GPPanel.insertBefore(Columns.lastElementChild, GPPanel.firstElementChild);
                     }
+                    GPPanel.insertAdjacentHTML(
+                        "beforeEnd",
+                        "<div " + (GM_getValue("GWC") ? "" : "class=\"rhHidden\" ") + "title=\"Giveaway Winning Chance\">" +
+                        "    <i class=\"fa fa-line-chart\"></i>" +
+                        "    <span class=\"GWCChance\"></span>" +
+                        "</div>" +
+                        "<a class=\"GDCBPButton" + (GM_getValue("GDCBP") ? "" : " rhHidden") + "\" title=\"Read giveaway description / add a comment to the giveaway.\">" +
+                        "    <i class=\"fa fa-file-text\"></i>" +
+                        "    <i class=\"fa fa-comment\"></i>" +
+                        "</a>" +
+                        "<div class=\"ELGBButton" + (GM_getValue("ELGB") ? "" : " rhHidden") + "\"></div>" +
+                        "<div class=\"rhHidden\">" +
+                        "    <div class=\"sidebar__error is-disabled\">" +
+                        "        <i class=\"fa fa-exclamation-circle\"></i> " +
+                        "        <span>Not Enough Points</span>" +
+                        "    </div>" +
+                        "</div>"
+                    );
+                    GP.ELGBButton = GPPanel.lastElementChild.previousElementSibling;
+                    GP.GDCBPButton = GP.ELGBButton.previousElementSibling;
+                    GP.GWCChance = GP.GDCBPButton.previousElementSibling.lastElementChild;
+                    GP.Code = GP.URL.match(/\/giveaway\/(.+?)\//)[1];
+                    Matches = Heading.parentElement.getElementsByClassName("giveaway__heading__thin");
+                    Match = Matches[0].textContent.match(/\((.+) Copies\)/);
+                    if (Match) {
+                        GP.Copies = parseInt(Match[1]);
+                        I = 1;
+                    } else {
+                        GP.Copies = 1;
+                        I = 0;
+                    }
+                    EntryPoints = parseInt(Matches[I].textContent.match(/\d+/)[0]);
+                    GP.ELGBButton.setAttribute("data-points", EntryPoints);
+                    GP.Username = Path.match(/^\/user\//) ?
+                        document.getElementsByClassName("featured__heading__medium")[0].textContent : Context.getElementsByClassName("giveaway__username")[0].textContent;
+                    GP.Points = document.getElementsByClassName("nav__points")[0];
+                    if (GM_getValue("ELGB")) {
+                        if (Context.classList.contains("is-faded")) {
+                            Context.classList.remove("is-faded");
+                            Context.classList.add("rhFaded");
+                            GP.ELGBButton.setAttribute("data-entered", true);
+                            setELGBButton(GP, "fa-minus-circle", "Leave", "Leaving...", "entry_delete", Context, true);
+                        } else {
+                            if (EntryPoints > parseInt(GP.Points.textContent)) {
+                                GP.ELGBButton.nextElementSibling.classList.remove("rhHidden");
+                            }
+                            setELGBButton(GP, "fa-plus-circle", "Enter", "Entering...", "entry_insert", Context);
+                        }
+                    }
+                    setGWCChance(GP.GWCChance, GP.Entries, GP.Copies);
+                    GP.GDCBPButton.addEventListener("click", function() {
+                        displayGDCBPPopup(GP);
+                    });
                 }
-                setGWCChance(GP.GWCChance, GP.Entries, GP.Copies);
-                GP.GDCBPButton.addEventListener("click", function() {
-                    displayGDCBPPopup(GP);
-                });
             }
         }
     }
@@ -14125,17 +14149,22 @@
     // Styles
 
     function addStyles() {
-        var Temp, Positive, Negative;
+        var Temp, Positive, Negative, Unknown;
         document.body.insertAdjacentHTML(
             "beforeEnd",
-            "<span class=\"author_small\">" +
-            "    <span class=\"giveaway__column--positive is_positive\"></span>" +
-            "    <span class=\"giveaway__column--negative is_negative\"></span>" +
+            "<span class=\"dropdown_btn\">" +
+            "    <i class=\"icon-green green\"></i>" +
+            "    <i class=\"icon-red red\"></i>" +
+            "    <i class=\"icon-grey grey\"></i>" +
             "</span>"
         );
         Temp = document.body.lastElementChild;
-        Positive = window.getComputedStyle(Temp.firstElementChild).color;
-        Negative = window.getComputedStyle(Temp.lastElementChild).color;
+        Positive = Temp.firstElementChild;
+        Negative = Positive.nextElementSibling;
+        Unknown = Negative.nextElementSibling;
+        Positive = window.getComputedStyle(Positive).color;
+        Negative = window.getComputedStyle(Negative).color;
+        Unknown = window.getComputedStyle(Unknown).color;
         Temp.remove();
         GM_addStyle(
             ".markdown {" +
@@ -14388,6 +14417,9 @@
             "    max-height: 200px;" +
             "    overflow: auto;" +
             "}" +
+            ".SGCBox .table__row-inner-wrap, .GGPBox .table__row-inner-wrap {" +
+            "    padding: 0 10px;" +
+            "}" +
             ".UHBox {" +
             "    background-position: center;" +
             "    margin: 5px 0 0;" +
@@ -14439,6 +14471,10 @@
             "}" +
             ".NAMWCNegative {" +
             "    color: " + Negative + " !important;" +
+            "    font-weight: bold;" +
+            "}" +
+            ".NAMWCUnknown {" +
+            "    color: " + Unknown + " !important;" +
             "    font-weight: bold;" +
             "}" +
             ".APBox .featured__outer-wrap {" +
