@@ -75,6 +75,7 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 * [Whitelist / Blacklist Checker](#whitelist--blacklist-checker)
 * [Not Activated / Multiple Wins Checker](#not-activated--multiple-wins-checker)
 * [Not Received Finder](#not-received-finder)
+* [User Giveaways Data](#user-giveaways-data)
 * [Inbox Winners Highlighter](#inbox-winners-highlighter)
 * [Avatar Popout](#avatar-popout)
 
@@ -295,6 +296,16 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 * Allows you to find an user's not received giveaways.
 * If the user doesn't have any not received giveaways, the button will not appear.
 * Results are cached for 7 days.
+
+### User Giveaways Data
+
+![](http://i.imgur.com/1ZeyWtw.png)
+![](http://i.imgur.com/Vq0Toc1.png)
+![](http://i.imgur.com/q3xqDym.png)
+
+* Gathers data about an user's giveaways, listing them by type and level.
+* Lists the most given away games for sent checks and the users most won from for won checks.
+* The data is not 100% accurate if the user has not received giveaways.
 
 ### Inbox Winners Highlighter
 
