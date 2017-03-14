@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.18
+// @version 4.18.1
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -3410,7 +3410,7 @@
             ID: "WBC_FC"
         }, {
             Check: function() {
-                return ((((WBC.User && !WBC.SC.checked) || !WBC.User) && !WBC.Update) ? true : false);
+                return ((((WBC.User && !WBC.SC.checked) || !WBC.User) && !WBC.Update && !Path.match(/^\/($|giveaways|discussions|users|archive)/)) ? true : false);
             },
             Description: "Check all pages.",
             Title: "If disabled, only the current page will be checked.",
