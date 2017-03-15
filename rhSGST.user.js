@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.20
+// @version 4.20.1
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -1236,16 +1236,16 @@
                             OwnedGames.push(ResponseGames[I].appid);
                         }
                         GM_setValue("OwnedGames", OwnedGames);
-                        Callback(true);
+                        Callback(1);
                     } else {
-                        Callback();
+                        Callback(2);
                     }
                 } else {
-                    Callback();
+                    Callback(3);
                 }
             });
         } else {
-            Callback();
+            Callback(4);
         }
     }
 
@@ -1782,7 +1782,9 @@
                 )
             }, {
                 Title: "Steam API Key",
-                HTML: "<input class=\"SMAPIKey\" type=\"text\"/>" + createDescription("This is required for Entries Remover to work.")
+                HTML: "<input class=\"SMAPIKey\" type=\"text\"/>" +
+                createDescription("This is required for Entries Remover to work." +
+                                  "Get a Steam API Key <a class=\"rhBold\" href=\"https://steamcommunity.com/dev/apikey\" target=\"_blank\">here</a>.")
             }]) +
             "</div>";
         createSMButtons([{
@@ -5408,10 +5410,9 @@
         ERButton.addEventListener("click", function() {
             Popup.popUp(function() {
                 ERButton.classList.add("rhBusy");
-                removeEREntries(Popup, function() {
+                removeEREntries(Popup, function(Message) {
                     Popup.Progress.innerHTML = "";
-                    Popup.OverallProgress.textContent = "Entries removed.";
-                    Popup.Close.click();
+                    Popup.OverallProgress.textContent = Message;
                     ERButton.classList.remove("rhBusy");
                 });
             });
@@ -5421,13 +5422,24 @@
     function removeEREntries(ER, Callback) {
         syncOwnedGames(ER, function(Result) {
             var CurrentPage;
-            if (Result) {
-                ER.Games = GM_getValue("OwnedGames");
-                CurrentPage = Location.match(/page=(\d+)/);
-                CurrentPage = CurrentPage ? parseInt(CurrentPage[1]) : 1;
-                checkEREntries(ER, 1, CurrentPage, "/giveaways/entered/search?page=", Callback);
-            } else {
-                Callback();
+            switch (Result) {
+                case 1:
+                    ER.Games = GM_getValue("OwnedGames");
+                    CurrentPage = Location.match(/page=(\d+)/);
+                    CurrentPage = CurrentPage ? parseInt(CurrentPage[1]) : 1;
+                    checkEREntries(ER, 1, CurrentPage, "/giveaways/entered/search?page=", function() {
+                        Callback("Entries removed.");
+                    });
+                    break;
+                case 2:
+                    Callback("No new games detected.");
+                    break;
+                case 3:
+                    Callback("Invalid Steam API Key.");
+                    break;
+                case 4:
+                    Callback("No Steam API Key found.");
+                    break;
             }
         });
     }
