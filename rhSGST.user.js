@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.21.2
+// @version 4.21.3
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -4118,33 +4118,38 @@
             RWSCVL = {
                 Progress: Context.lastElementChild
             };
-            User.RWSCVL = getUser(User).RWSCVL;
-            if (!User.RWSCVL) {
-                User.RWSCVL = {
-                    WonCV: 0,
-                    SentCV: 0,
-                    LastWonCheck: 0,
-                    LastSentCheck: 0
-                };
-            }
-            if ((new Date().getTime()) - User.RWSCVL["Last" + Key + "Check"] > 604800000) {
-                queueRequest(RWSCVL, null, URL, function(Response) {
-                    var Value;
-                    RWSCVL.Progress.remove();
-                    Value = parseHTML(Response.responseText).getElementById("data").textContent.replace(/\s\$/, "");
-                    User.RWSCVL[Key + "CV"] = Value;
-                    User.RWSCVL["Last" + Key + "Check"] = new Date().getTime();
-                    queueSave(RWSCVL, function() {
-                        saveUser(User, RWSCVL, function() {
-                            GM_setValue("LastSave", 0);
-                            Context.insertAdjacentText("beforeEnd", " ($" + Value + " Real CV)");
+            queueSave(RWSCVL, function() {
+                saveUser(User, RWSCVL, function() {
+                    GM_setValue("LastSave", 0);
+                    User.RWSCVL = getUser(User).RWSCVL;
+                    if (!User.RWSCVL) {
+                        User.RWSCVL = {
+                            WonCV: 0,
+                            SentCV: 0,
+                            LastWonCheck: 0,
+                            LastSentCheck: 0
+                        };
+                    }
+                    if ((new Date().getTime()) - User.RWSCVL["Last" + Key + "Check"] > 604800000) {
+                        queueRequest(RWSCVL, null, URL, function(Response) {
+                            var Value;
+                            RWSCVL.Progress.remove();
+                            Value = parseHTML(Response.responseText).getElementById("data").textContent.replace(/\s\$/, "");
+                            User.RWSCVL[Key + "CV"] = Value;
+                            User.RWSCVL["Last" + Key + "Check"] = new Date().getTime();
+                            queueSave(RWSCVL, function() {
+                                saveUser(User, RWSCVL, function() {
+                                    GM_setValue("LastSave", 0);
+                                    Context.insertAdjacentText("beforeEnd", " ($" + Value + " Real CV)");
+                                });
+                            });
                         });
-                    });
+                    } else {
+                        RWSCVL.Progress.remove();
+                        Context.insertAdjacentText("beforeEnd", " ($" + User.RWSCVL[Key + "CV"] + " Real CV)");
+                    }
                 });
-            } else {
-                RWSCVL.Progress.remove();
-                Context.insertAdjacentText("beforeEnd", " ($" + User.RWSCVL[Key + "CV"] + " Real CV");
-            }
+            });
         }
     }
 
