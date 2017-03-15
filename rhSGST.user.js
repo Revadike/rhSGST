@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.19
+// @version 4.19.1
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -5665,13 +5665,14 @@
     }
 
     function notifyDGNGift(ResponseHTML, WonIcon) {
-        var Matches, Delivered, I, N, Feedbacks;
+        var Matches, Delivered, I, N, Received, NotReceived;
         Matches = ResponseHTML.getElementsByClassName("table__row-inner-wrap");
         Delivered = 0;
         for (I = 0, N = Matches.length; I < N; ++I) {
-            Feedbacks = Matches[I].getElementsByClassName("table__column--gift-feedback");
-            if (!Feedbacks[0].firstElementChild.nextElementSibling.classList.contains("is-hidden") && !Feedbacks[1].firstElementChild.nextElementSibling.classList.contains("is-hidden") &&
-                (Feedbacks[0].previousElementSibling.innerHTML.trim() != "-")) {
+            Received = Matches[I].getElementsByClassName("table__gift-feedback-received")[0];
+            NotReceived = Matches[I].getElementsByClassName("table__gift-feedback-not-received")[0];
+            if ((Received.classList.contains("is-hidden") && ((NotReceived && NotReceived.classList.contains("is-hidden")) || !NotReceived)) &&
+                Matches[I].querySelector("[data-clipboard-text]")) {
                 ++Delivered;
             }
         }
