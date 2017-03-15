@@ -43,10 +43,12 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 * [Giveaway Winning Chance](#giveaway-winning-chance)
 * [Giveaway Groups Popout](#giveaway-groups-popout)
 * [Giveaway Winners Link](#giveaway-winners-link)
+* [Delivered Gifts Notifier](#delivered-gifts-notifier)
 * [Unsent Gifts Sender](#unsent-gifts-sender)
 
 ## Discussions
 
+* [Active Discussions On Top](#active-discussions-on-top)
 * [Discussions Highlighter](#discussions-highlighter)
 * [Main Post Popup](#main-post-popup)
 * [Discussion Edit Detector](#discussion-edit-detector)
@@ -90,6 +92,7 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 * [Blacklist Stats Hider](#blacklist-stats-hider)
 * [Multi-Tag](#multi-tag)
 * [Groups Highlighter](#groups-highlighter)
+* [Groups Stats](#groups-stats)
 * [Archive Searcher](#archive-searcher)
 
 * [Other Info](#other-info)
@@ -141,6 +144,12 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 * You can refresh pages without leaving the page.
 * You can pause / resume the endless scrolling.
 * You can enable reverse scrolling for discussions.
+
+### Active Discussions On Top
+
+`steamgifts.com/*`
+
+* Moves the active discussions to the top of the page.
 
 ### Grid View
 
@@ -360,9 +369,14 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 
 * Updates the header icons every 60 seconds (only if the tab is active).
 * You can enable an option that runs the refresher in the background and changes the icon of the tab when not active.
-* This feature also notifies you if one of your won gifts has been delivered:
 
-![](http://i.imgur.com/BDTqCPU.png)
+### Delivered Gifts Notifier
+
+`steamgifts.com/*`
+
+![](http://i.imgur.com/z4EZZm6.png)
+
+* Notifies you if one of your won gifts has been delivered.
 
 ### Advanced Giveaway Search
 
@@ -425,6 +439,14 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 ![](http://i.imgur.com/eaGeLUj.png)
 
 * Highlights which groups you are a member of in the giveaway groups page.
+
+### Groups Stats
+
+`steamgifts.com/account/steam/groups/*`
+
+![](http://i.imgur.com/b7jV7Gu.png?1)
+
+* Shows your status in groups from your groups page.
 
 ### Giveaway Groups Popout
 

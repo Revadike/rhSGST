@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.18.1
+// @version 4.19
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -67,9 +67,6 @@
             ES_R: {
                 Name: "Enable in the rest of the pages."
             },
-            ES_RD: {
-                Name: "Show recent discussions at the top."
-            },
             ES_RS: {
                 Name: "Disable reverse scrolling."
             }
@@ -128,8 +125,14 @@
         GWL: {
             Name: "Giveaway Winners Link"
         },
+        DGN: {
+            Name: "Delivered Gifts Notifier",
+        },
         UGS: {
             Name: "Unsent Gifts Sender"
+        },
+        ADOT: {
+            Name: "Active Discussions On Top"
         },
         DH: {
             Name: "Discussions Highlighter"
@@ -299,6 +302,9 @@
         GH: {
             Name: "Groups Highlighter"
         },
+        GS: {
+            Name: "Groups Status"
+        },
         AS: {
             Name: "Archive Searcher"
         },
@@ -412,7 +418,7 @@
         if (SG) {
             addHMMenu();
         }
-        if (GM_getValue("FCH") && Path.match(/^\/($|giveaways(?!\/(wishlist|created|entered|won|new)))/)) {
+        if (GM_getValue("FCH") && SG && Path.match(/^\/($|giveaways(?!\/(wishlist|created|entered|won|new)))/)) {
             hideFCHContainer();
         } else if (GM_getValue("BSH") && Path.match(/^\/stats\/personal\/community/)) {
             hideBSHStats();
@@ -450,6 +456,8 @@
         if (SG) {
             if (GM_getValue("HIR")) {
                 setHIRRefresher();
+            } else if (GM_getValue("DGN")) {
+                checkDGNGifts();
             }
             if (GM_getValue("PR")) {
                 setPRRefresher();
@@ -462,11 +470,17 @@
                     setSGGGroups();
                 }
             }
+            if (GM_getValue("GS") && Path.match(/^\/account\/steam\/groups/)) {
+                addGSHeading();
+            }
         }
         Users = {};
         Games = {};
         APBoxes = {};
         loadEndlessFeatures(document);
+        if (GM_getValue("ADOT") && Path.match(/^\/($|giveaways(?!.+(wishlist|created|entered|won)))/)) {
+            moveADOTDiscussions();
+        }
         setTimeout(goToComment, 1000);
     }
 
@@ -635,6 +649,10 @@
             Callback: addASButton
         }]);
         loadMatchesFeatures(Context, [{
+            Check: GM_getValue("GS") && Path.match(/^\/account\/steam\/groups/),
+            Query: ".table__row-inner-wrap",
+            Callback: loadGSStatus
+        }, {
             Check: GM_getValue("SGG") && Path.match(/^\/account\/steam\/groups/),
             Query: ".table__row-inner-wrap",
             Callback: setSGGGroups,
@@ -752,14 +770,27 @@
     }
 
     function goToComment() {
-        var Match, Element, Heading;
-        Match = window.location.href.match(/#(.+)/);
-        if (Match && !Path.match(/^\/account/)) {
-            Element = document.getElementById(Match[1]);
+        var ID, Element, Top, Heading, Permalink;
+        ID = window.location.hash.replace(/#/, "");
+        if (ID && !Path.match(/^\/account/)) {
+            Element = document.getElementById(ID);
             if (Element) {
-                Heading = document.getElementsByClassName("FEHeading")[0];
-                window.scrollTo(0, Element.offsetTop - (Heading ? 0 : 39));
-                window.scrollBy(0, -(document.getElementsByTagName("header")[0].offsetHeight + 64));
+                Top = Element.offsetTop;
+                if ((Top - 64) < (document.body.offsetHeight - window.innerHeight)) {
+                    Heading = document.getElementsByClassName("FEHeading")[0];
+                    window.scrollTo(0, Element.offsetTop - (Heading ? 0 : 39));
+                    window.scrollBy(0, -(document.getElementsByTagName("header")[0].offsetHeight + 64));
+                }
+                Permalink = document.getElementsByClassName("comment__permalink")[0];
+                if (Permalink) {
+                    Permalink.remove();
+                }
+                Element.getElementsByClassName("comment__username")[0].insertAdjacentHTML(
+                    "beforeBegin",
+                    "<div class=\"comment__permalink\">" +
+                    "    <i class=\"fa fa-share\"></i>" +
+                    "</div>"
+                );
             }
         }
     }
@@ -1755,12 +1786,12 @@
         SMSyncFrequency = Container.getElementsByClassName("SMSyncFrequency")[0];
         SMLastSync = Container.getElementsByClassName("SMLastSync")[0];
         SMGeneralFeatures = ["FE", "ES", "GV", "HIR", "AT", "PR"];
-        SMGiveawayFeatures = ["GTS", "SGG", "AGS", "EGF", "ELGB", "GDCBP", "GWC", "GGP", "GWL", "UGS"];
-        SMDiscussionFeatures = ["DH", "MPP", "DED"];
+        SMGiveawayFeatures = ["GTS", "SGG", "AGS", "EGF", "ELGB", "GDCBP", "GWC", "GGP", "GWL", "DGN", "UGS"];
+        SMDiscussionFeatures = ["ADOT", "DH", "MPP", "DED"];
         SMCommentingFeatures = ["CH", "CT", "CFH", "MCBP", "MR", "RFI", "RML"];
         SMUserFeatures = ["UH", "PUN", "RWSCVL", "SWR", "SGPB", "STPB", "SGC", "PUT", "WBH", "WBC", "NAMWC", "NRF", "UGD", "IWH", "AP"];
         SMGameFeatures = ["EGH", "GT"];
-        SMOtherFeatures = ["FCH", "BSH", "MT", "GH", "AS", "SM_D"];
+        SMOtherFeatures = ["FCH", "BSH", "MT", "GH", "GS", "AS", "SM_D"];
         for (ID in Features) {
             if (SMGeneralFeatures.indexOf(ID) >= 0) {
                 SMGeneral.appendChild(getSMFeature(Features[ID], ID));
@@ -2243,6 +2274,23 @@
         });
     }
 
+    // [ADOT] Active Discussions On Top
+
+    GM_addStyle(
+        ".ADOTContainer {" +
+        "    margin: 25px 0;" +
+        "}"
+    );
+
+    function moveADOTDiscussions() {
+        var ADOTContainer, Container;
+        ADOTContainer = document.getElementsByClassName("widget-container--margin-top")[0];
+        ADOTContainer.classList.add("ADOTContainer");
+        Container = document.getElementsByClassName("page__heading")[0].parentElement;
+        Container.insertBefore(ADOTContainer.previousElementSibling, Container.firstElementChild);
+        Container.insertBefore(ADOTContainer, Container.firstElementChild.nextElementSibling);
+    }
+
     // Featured Container Hider
 
     function hideFCHContainer() {
@@ -2417,13 +2465,6 @@
                     Temp.appendChild(Context.lastElementChild);
                 }
                 Context.appendChild(Temp);
-            }
-            RecentDiscussions = document.getElementsByClassName("widget-container--margin-top")[0];
-            if (GM_getValue("ES_RD") && RecentDiscussions) {
-                RecentDiscussions.classList.add("ESRecentDiscussions");
-                Container = Heading.parentElement;
-                Container.insertBefore(RecentDiscussions.previousElementSibling, Container.firstElementChild);
-                Container.insertBefore(RecentDiscussions, Container.firstElementChild.nextElementSibling);
             }
             MainPagination = document.getElementsByClassName("pagination")[0];
             CommentBox = document.getElementsByClassName(SG ? "comment comment--submit" : "reply_form")[0];
@@ -2667,6 +2708,7 @@
         if (Context) {
             loadEndlessFeatures(Context);
             setESHide(Context);
+            setESRemoveEntry(Context);
             for (I = 0, N = Context.children.length; I < N; ++I) {
                 DocumentFragment.appendChild(Context[RS ? "lastElementChild" : "firstElementChild"]);
             }
@@ -2691,6 +2733,42 @@
                     followSpeed: 500,
                     modalColor: "#3c424d",
                     opacity: 0.85
+                });
+            });
+        }
+    }
+
+    function setESRemoveEntry(Context) {
+        var Matches, I, N;
+        Matches = Context.getElementsByClassName("table__row-inner-wrap");
+        for (I = 0, N = Matches.length; I < N; ++I) {
+            removeESEntry(Matches[I]);
+        }
+    }
+
+    function removeESEntry(Context) {
+        var Default, Loading, Complete, Data;
+        Default = Context.getElementsByClassName("table__remove-default")[0];
+        if (Default) {
+            Loading = Default.nextElementSibling;
+            Complete = Loading.nextElementSibling;
+            Default.addEventListener("click", function() {
+                var Values, I, N;
+                Default.classList.toggle("is-hidden");
+                Loading.classList.toggle("is-hidden");
+                Values = Context.getElementsByTagName("input");
+                Data = "";
+                for (I = 0, N = Values.length; I < N; ++I) {
+                    Data += Values[I].getAttribute("name") + "=" + Values[I].value + ((I < (N - 1)) ? "&" : "");
+                }
+                makeRequest(Data, "/ajax.php", null, function(Response) {
+                    Loading.classList.toggle("is-hidden");
+                    if (parseJSON(Response.responseText).type == "success") {
+                        Context.classList.add("is-faded");
+                        Complete.classList.toggle("is-hidden");
+                    } else {
+                        Default.classList.toggle("is-hidden");
+                    }
                 });
             });
         }
@@ -4569,7 +4647,8 @@
                     getUGDGiveaways(UGD, User, 1, Match ? parseInt(Match[1]) : 1, "/user/" + User.Username + ((UGD.Key == "Won") ? "/giveaways/won" : "") + "/search?page=", function() {
                         queueSave(UGD, function() {
                             saveUser(User, UGD, function() {
-                                var Giveaways, Types, TypesTotal, LevelsTotal, Total, Frequencies, Key, I, N, Giveaway, Private, Group, Whitelist, Region, Level, Copies, HTML, Type, Ordered;
+                                var Giveaways, Types, TypesTotal, LevelsTotal, Total, Frequencies, Key, I, N, Giveaway, Private, Group, Whitelist, Region, Level, Copies, Value, HTML, Type,
+                                    Ordered;
                                 GM_setValue("LastSave", 0);
                                 UGDButton.classList.remove("rhBusy");
                                 Giveaways = User.UGD[UGD.Key];
@@ -4693,22 +4772,25 @@
                                         "<tr>" +
                                         "    <td>" + Type.replace(/_/g, " + ") + "</td>";
                                     for (I = 0; I <= 10; ++I) {
+                                        Value = Types[Type][I];
                                         HTML +=
-                                            "<td>" + Types[Type][I] + "</td>";
+                                            "<td" + (Value ? "" : " class=\"is-faded\"") + ">" + Value + "</td>";
                                     }
+                                    Value = Math.round(TypesTotal[Type] / Total * 10000) / 100;
                                     HTML +=
-                                        "    <td>" + TypesTotal[Type] + " (" + (Math.round(TypesTotal[Type] / Total * 10000) / 100) + "%)</td>" +
+                                        "    <td" + (Value ? "" : " class=\"is-faded\"") + ">" + TypesTotal[Type] + " (" + Value + "%)</td>" +
                                         "</tr>";
                                 }
                                 HTML +=
                                     "    <tr>" +
                                     "        <td>Total</td>";
                                 for (I = 0; I <= 10; ++I) {
+                                    Value = Math.round(LevelsTotal[I] / Total * 10000) / 100;
                                     HTML +=
-                                        "    <td>" + LevelsTotal[I] + " (" + (Math.round(LevelsTotal[I] / Total * 10000) / 100) +  "%)</td>";
+                                        "    <td" + (Value ? "" : " class=\"is-faded\"") + ">" + LevelsTotal[I] + " (" + Value +  "%)</td>";
                                 }
                                 HTML +=
-                                    "        <td>" + Total + "</td>" +
+                                    "        <td" + (Total ? "" : " class=\"is-faded\"") + ">" + Total + "</td>" +
                                     "    </tr>" +
                                     "</table>";
                                 Ordered = [];
@@ -5546,20 +5628,9 @@
             CreatedIcon.className = Created.className;
             CreatedIcon.innerHTML = Created.innerHTML;
             WonIcon.className = Won.className;
-            WonIcon.classList.add("HIRWon");
             WonIcon.innerHTML = Won.innerHTML;
-            Matches = ResponseHTML.getElementsByClassName("table__row-inner-wrap");
-            for (I = 0, N = Matches.length; I < N; ++I) {
-                Context = Matches[I].getElementsByClassName("table__column--gift-feedback")[0];
-                if (!Context.firstElementChild.nextElementSibling.classList.contains("is-hidden") && (Context.previousElementSibling.innerHTML.trim() != "-")) {
-                    WonIcon.firstElementChild.classList.add("giveaway__column--positive");
-                    GM_addStyle(
-                        ".HIRWon i {" +
-                        "    color: inherit !important;" +
-                        "}"
-                    );
-                    break;
-                }
+            if (GM_getValue("DGN")) {
+                notifyDGNGift(ResponseHTML, WonIcon);
             }
             MessagesIcon.className = Messages.className;
             MessagesIcon.innerHTML = Messages.innerHTML;
@@ -5582,6 +5653,36 @@
             queueRequest({}, null, "/giveaways/won", Callback);
         } else {
             makeRequest(null, "/giveaways/won", null, Callback);
+        }
+    }
+
+    // Delivered Gifts Notifier
+
+    function checkDGNGifts() {
+        makeRequest(null, "/giveaways/won", null, function(Response) {
+            notifyDGNGift(parseHTML(Response.responseText), document.getElementsByClassName("nav__button-container--notification")[1]);
+        });
+    }
+
+    function notifyDGNGift(ResponseHTML, WonIcon) {
+        var Matches, Delivered, I, N, Feedbacks;
+        Matches = ResponseHTML.getElementsByClassName("table__row-inner-wrap");
+        Delivered = 0;
+        for (I = 0, N = Matches.length; I < N; ++I) {
+            Feedbacks = Matches[I].getElementsByClassName("table__column--gift-feedback");
+            if (!Feedbacks[0].firstElementChild.nextElementSibling.classList.contains("is-hidden") && !Feedbacks[1].firstElementChild.nextElementSibling.classList.contains("is-hidden") &&
+                (Feedbacks[0].previousElementSibling.innerHTML.trim() != "-")) {
+                ++Delivered;
+            }
+        }
+        if (Delivered) {
+            GM_addStyle(
+                ".DGNIcon i {" +
+                "    color: #FECC66;" +
+                "}"
+            );
+            WonIcon.classList.add("DGNIcon");
+            WonIcon.firstElementChild.title = "Giveaways Won (" + Delivered + " Delivered)";
         }
     }
 
@@ -6002,6 +6103,43 @@
                 Matches[I].closest(".table__row-outer-wrap").classList.add("GHHighlight");
             }
         }
+    }
+
+    // [GS] Groups Status
+
+    function addGSHeading() {
+        var Context;
+        Context = document.getElementsByClassName("table__heading")[0];
+        Context.insertAdjacentHTML(
+            "beforeEnd",
+            "<div class=\"table__column--width-small text-center\">Sent</div>" +
+            "<div class=\"table__column--width-small text-center\">Received</div>" +
+            "<div class=\"table__column--width-small text-center\">Gift Difference</div>" +
+            "<div class=\"table__column--width-small text-center\">Value Difference</div>"
+        );
+    }
+
+    function loadGSStatus(Context) {
+        var GS, URL;
+        Context.insertAdjacentHTML(
+            "beforeEnd",
+            "<div class=\"table__column--width-small text-center\">" +
+            "    <i class=\"fa fa-circle-o-notch fa-spin\"></i>" +
+            "    <span>Loading group stats...</span>" +
+            "</div>"
+        );
+        GS = {
+            Progress: Context.lastElementChild
+        };
+        URL = Context.getElementsByClassName("table__column__heading")[0].getAttribute("href") + "/users/search?q=" + GM_getValue("Username");
+        queueRequest(GS, null, URL, function(Response) {
+            var Matches, I, N;
+            GS.Progress.remove();
+            Matches = parseHTML(Response.responseText).getElementsByClassName("table__row-inner-wrap")[0].getElementsByClassName("table__column--width-small");
+            for (I = 0, N = Matches.length; I < N; ++I) {
+                Context.appendChild(Matches[0]);
+            }
+        });
     }
 
     // Giveaway Groups Popout
@@ -14564,7 +14702,7 @@
             "}" +
             ".rhPopup {" +
             "    max-width: 75%;" +
-            "    min-width: 75%;" +
+            "    min-width: 300px;" +
             "    max-height: 75%;" +
             "    overflow: auto;" +
             "}" +
@@ -14631,7 +14769,6 @@
             "    height: auto;" +
             "    line-height: normal;" +
             "    max-height: 600px;" +
-            "    overflow: auto;" +
             "    padding: 5px !important;" +
             "    position: absolute;" +
             "    text-align: left;" +
@@ -14858,6 +14995,9 @@
             "}" +
             ".UGDData {" +
             "    width: 100%;" +
+            "}" +
+            ".UGDData tr:hover {" +
+            "    background-color: rgba(119, 137, 154, 0.2);" +
             "}" +
             ".UGDData th {" +
             "    border: 1px solid;" +
