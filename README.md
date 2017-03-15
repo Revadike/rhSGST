@@ -45,6 +45,7 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 * [Giveaway Winners Link](#giveaway-winners-link)
 * [Delivered Gifts Notifier](#delivered-gifts-notifier)
 * [Unsent Gifts Sender](#unsent-gifts-sender)
+* [Entries Remover](#entries-remover)
 
 ## Discussions
 
@@ -344,6 +345,17 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 
 * Allows you to send all your unsent gifts directly from your created giveaways page.
 * You can choose to only send the gifts to winners with 0 not activated / multiple wins or who are whitelisted.
+
+### Entries Remover
+
+`steamgifts.com/giveaways/entered/*`
+
+![](http://i.imgur.com/kXTZeWo.png)
+
+* Allows you to remove entries for owned games.
+* In order for the feature to work, you must enter your Steam API Key in section 9 of the settings menu (get a Steam API Key [here](https://steamcommunity.com/dev/apikey)):
+
+![](http://i.imgur.com/MK5cVax.png)
 
 ### Giveaway Templates
 

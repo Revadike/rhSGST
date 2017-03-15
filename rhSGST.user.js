@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.19.1
+// @version 4.20
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -19,6 +19,7 @@
 // @connect script.googleusercontent.com
 // @connect sgtools.info
 // @connect steamcommunity.com
+// @connect api.steampowered.com
 // @require https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js
 // @require https://greasyfork.org/scripts/26575-bpopup/code/bPopup.js?version=169515
 // @require https://cdn.steamgifts.com/js/highcharts.js
@@ -130,6 +131,9 @@
         },
         UGS: {
             Name: "Unsent Gifts Sender"
+        },
+        ER: {
+            Name: "Entries Remover"
         },
         ADOT: {
             Name: "Active Discussions On Top"
@@ -303,7 +307,7 @@
             Name: "Groups Highlighter"
         },
         GS: {
-            Name: "Groups Status"
+            Name: "Groups Stats"
         },
         AS: {
             Name: "Archive Searcher"
@@ -351,6 +355,7 @@
             Avatar: "",
             Username: "",
             SteamID64: "",
+            OwnedGames: [],
             Users: [],
             Games: {},
             Groups: [],
@@ -615,6 +620,10 @@
             Check: GM_getValue("MT") && (GM_getValue("PUT") || GM_getValue("GT")) && Object.keys(CurrentUsers).length && !Path.match(/^\/account/),
             Name: "MTContainer",
             Callback: addMTContainer
+        }, {
+            Check: GM_getValue("ER") && Path.match(/\/giveaways\/entered/),
+            Name: "ERButton",
+            Callback: addERButton
         }, {
             Check: GM_getValue("UGS") && Path.match(/\/giveaways\/created/),
             Name: "UGSButton",
@@ -1099,10 +1108,12 @@
                 "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
                 "<span>Syncing your whitelist / blacklist...</span>";
             syncWhitelistBlacklist(Sync, function() {
-                var CurrentDate;
-                CurrentDate = new Date();
-                GM_setValue("LastSync", CurrentDate.getTime());
-                Callback(CurrentDate);
+                syncOwnedGames(Sync, function() {
+                    var CurrentDate;
+                    CurrentDate = new Date();
+                    GM_setValue("LastSync", CurrentDate.getTime());
+                    Callback(CurrentDate);
+                });
             });
         });
     }
@@ -1205,6 +1216,36 @@
             } else {
                 Callback();
             }
+        }
+    }
+
+    function syncOwnedGames(Sync, Callback) {
+        var SteamAPIKey, URL;
+        SteamAPIKey = GM_getValue("SteamAPIKey");
+        if (SteamAPIKey) {
+            URL = "http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=" + SteamAPIKey + "&steamid=" + GM_getValue("SteamID64") + "&format=json";
+            makeRequest(null, URL, Sync.Progress, function(Response) {
+                var ResponseText, ResponseGames, N, OwnedGames, I;
+                ResponseText = Response.responseText;
+                if (!ResponseText.match(/<title>Forbidden<\/title>/)) {
+                    ResponseGames = parseJSON(ResponseText).response.games;
+                    N = ResponseGames.length;
+                    if (N != GM_getValue("OwnedGames").length) {
+                        OwnedGames = [];
+                        for (I = 0; I < N; ++I) {
+                            OwnedGames.push(ResponseGames[I].appid);
+                        }
+                        GM_setValue("OwnedGames", OwnedGames);
+                        Callback(true);
+                    } else {
+                        Callback();
+                    }
+                } else {
+                    Callback();
+                }
+            });
+        } else {
+            Callback();
         }
     }
 
@@ -1683,7 +1724,7 @@
     function loadSMMenu(Sidebar, SMButton) {
         var Selected, Item, SMSyncFrequency, I, Container, SMGeneral, SMGiveaways, SMDiscussions, SMCommenting, SMUsers, SMGames, SMOthers, SMManageData, SMRecentUsernameChanges,
             SMCommentHistory, SMManageTags, SMGeneralFeatures, SMGiveawayFeatures, SMDiscussionFeatures, SMCommentingFeatures, SMUserFeatures, SMGameFeatures, SMOtherFeatures, ID,
-            SMLastSync, LastSync;
+            SMLastSync, LastSync, SMAPIKey;
         Selected = Sidebar.getElementsByClassName("is-selected")[0];
         Selected.classList.remove("is-selected");
         SMButton.classList.add("is-selected");
@@ -1726,7 +1767,7 @@
                 Title: "Others",
                 Name: "SMOthers"
             }, {
-                Title: "Sync Whitelist / Blacklist",
+                Title: "Sync Groups / Whitelist / Blacklist / Owned Games",
                 HTML: SMSyncFrequency + createDescription("Select from how many days to how many days you want the automatic sync to run (0 to disable it).") + (
                     "<div class=\"form__sync\">" +
                     "    <div class=\"form__sync-data\">" +
@@ -1739,6 +1780,9 @@
                     "    </div>" +
                     "</div>"
                 )
+            }, {
+                Title: "Steam API Key",
+                HTML: "<input class=\"SMAPIKey\" type=\"text\"/>" + createDescription("This is required for Entries Remover to work.")
             }]) +
             "</div>";
         createSMButtons([{
@@ -1785,8 +1829,9 @@
         SMManageTags = Container.getElementsByClassName("SMManageTags")[0];
         SMSyncFrequency = Container.getElementsByClassName("SMSyncFrequency")[0];
         SMLastSync = Container.getElementsByClassName("SMLastSync")[0];
+        SMAPIKey = Container.getElementsByClassName("SMAPIKey")[0];
         SMGeneralFeatures = ["FE", "ES", "GV", "HIR", "AT", "PR"];
-        SMGiveawayFeatures = ["GTS", "SGG", "AGS", "EGF", "ELGB", "GDCBP", "GWC", "GGP", "GWL", "DGN", "UGS"];
+        SMGiveawayFeatures = ["GTS", "SGG", "AGS", "EGF", "ELGB", "GDCBP", "GWC", "GGP", "GWL", "DGN", "UGS", "ER"];
         SMDiscussionFeatures = ["ADOT", "DH", "MPP", "DED"];
         SMCommentingFeatures = ["CH", "CT", "CFH", "MCBP", "MR", "RFI", "RML"];
         SMUserFeatures = ["UH", "PUN", "RWSCVL", "SWR", "SGPB", "STPB", "SGC", "PUT", "WBH", "WBC", "NAMWC", "NRF", "UGD", "IWH", "AP"];
@@ -1822,6 +1867,9 @@
             SMLastSync.innerHTML =
                 "<i class=\"fa fa-check-circle\"></i> Last synced " + CurrentDate.toLocaleString() + ".";
         });
+        if (GM_getValue("SteamAPIKey")) {
+            SMAPIKey.value = GM_getValue("SteamAPIKey");
+        }
         addWBCButton();
         addNAMWCButton();
         SMSyncFrequency.addEventListener("change", function() {
@@ -2060,6 +2108,9 @@
         if (SMCommentHistory) {
             setSMCommentHistory(SMCommentHistory);
         }
+        SMAPIKey.addEventListener("input", function() {
+            GM_setValue("SteamAPIKey", SMAPIKey.value);
+        });
     }
 
     function getSMFeature(Feature, ID) {
@@ -5332,6 +5383,108 @@
         }
     }
 
+    // [ER] Entries Remover
+
+    GM_addStyle(
+        ".ERButton {" +
+        "    cursor: pointer;" +
+        "    display: inline-block;" +
+        "}"
+    );
+
+    function addERButton(Context) {
+        var ERButton, Popup;
+        Context.insertAdjacentHTML(
+            "afterBegin",
+            "<div class=\"ERButton\" title=\"Remove entries for owned games.\">" +
+            "    <i class=\"fa fa-tag\"></i>" +
+            "    <i class=\"fa fa-times-circle\"></i>" +
+            "</div>"
+        );
+        ERButton = Context.firstElementChild;
+        Popup = createPopup();
+        Popup.Icon.classList.add("fa-times");
+        Popup.Title.textContent = "Remove entries for owned games:";
+        ERButton.addEventListener("click", function() {
+            Popup.popUp(function() {
+                ERButton.classList.add("rhBusy");
+                removeEREntries(Popup, function() {
+                    Popup.Progress.innerHTML = "";
+                    Popup.OverallProgress.textContent = "Entries removed.";
+                    Popup.Close.click();
+                    ERButton.classList.remove("rhBusy");
+                });
+            });
+        });
+    }
+
+    function removeEREntries(ER, Callback) {
+        syncOwnedGames(ER, function(Result) {
+            var CurrentPage;
+            if (Result) {
+                ER.Games = GM_getValue("OwnedGames");
+                CurrentPage = Location.match(/page=(\d+)/);
+                CurrentPage = CurrentPage ? parseInt(CurrentPage[1]) : 1;
+                checkEREntries(ER, 1, CurrentPage, "/giveaways/entered/search?page=", Callback);
+            } else {
+                Callback();
+            }
+        });
+    }
+
+    function checkEREntries(ER, NextPage, CurrentPage, URL, Callback, Context) {
+        var Matches, N, Pagination;
+        if (Context) {
+            Matches = Context.getElementsByClassName("table__remove-default");
+            N = Matches.length;
+            if (N > 0) {
+                checkEREntry(0, Matches.length, Matches, ER, Context, function() {
+                    Pagination = Context.getElementsByClassName("pagination__navigation")[0];
+                    if (Pagination && !Pagination.lastElementChild.classList.contains("is-selected")) {
+                        setTimeout(checkEREntries, 0, ER, NextPage, CurrentPage, URL, Callback);
+                    } else {
+                        Callback();
+                    }
+                });
+            } else {
+                Callback();
+            }
+        } else {
+            ER.Progress.innerHTML =
+                "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
+                "<span>Checking page " + NextPage + "...</span>";
+            if (CurrentPage != NextPage) {
+                queueRequest(ER, null, URL + NextPage, function(Response) {
+                    setTimeout(checkEREntries, 0, ER, ++NextPage, CurrentPage, URL, Callback, parseHTML(Response.responseText));
+                });
+            } else {
+                setTimeout(checkEREntries, 0, ER, ++NextPage, CurrentPage, URL, Callback, document);
+            }
+        }
+    }
+
+    function checkEREntry(I, N, Matches, ER, Context, Callback) {
+        var ID;
+        if (I < N) {
+            ID = parseInt(Matches[I].closest(".table__row-inner-wrap").getElementsByClassName("global__image-outer-wrap--game-small")[0].firstElementChild.getAttribute("style")
+                          .match(/\/(apps|subs)\/(\d+)/)[2]);
+            if (ER.Games.indexOf(ID) >= 0) {
+                if (Context == document) {
+                    Matches[I].click();
+                    setTimeout(checkEREntry, 0, ++I, N, Matches, ER, Context, Callback);
+                } else {
+                    queueRequest(ER, "xsrf_token=" + XSRFToken + "&do=entry_delete&code=" + Matches[I].parentElement.querySelector("[name='code']").value, "/ajax.php", function() {
+                        setTimeout(checkEREntry, 0, ++I, N, Matches, ER, Context, Callback);
+                    });
+                }
+            } else {
+                setTimeout(checkEREntry, 0, ++I, N, Matches, ER, Context, Callback);
+            }
+        } else {
+            Callback();
+        }
+    }
+
     // Giveaway Templates
 
     function addGTSButtons() {
@@ -6106,7 +6259,7 @@
         }
     }
 
-    // [GS] Groups Status
+    // [GS] Groups Stats
 
     function addGSHeading() {
         var Context;
