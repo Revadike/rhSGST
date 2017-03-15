@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.20.1
+// @version 4.20.2
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -5478,16 +5478,20 @@
     function checkEREntry(I, N, Matches, ER, Context, Callback) {
         var ID;
         if (I < N) {
-            ID = parseInt(Matches[I].closest(".table__row-inner-wrap").getElementsByClassName("global__image-outer-wrap--game-small")[0].firstElementChild.getAttribute("style")
-                          .match(/\/(apps|subs)\/(\d+)/)[2]);
-            if (ER.Games.indexOf(ID) >= 0) {
-                if (Context == document) {
-                    Matches[I].click();
-                    setTimeout(checkEREntry, 0, ++I, N, Matches, ER, Context, Callback);
-                } else {
-                    queueRequest(ER, "xsrf_token=" + XSRFToken + "&do=entry_delete&code=" + Matches[I].parentElement.querySelector("[name='code']").value, "/ajax.php", function() {
+            ID = Matches[I].closest(".table__row-inner-wrap").getElementsByClassName("global__image-outer-wrap--game-small")[0].firstElementChild.getAttribute("style");
+            if (ID) {
+                ID = parseInt(ID.match(/\/(apps|subs)\/(\d+)/)[2]);
+                if (ER.Games.indexOf(ID) >= 0) {
+                    if (Context == document) {
+                        Matches[I].click();
                         setTimeout(checkEREntry, 0, ++I, N, Matches, ER, Context, Callback);
-                    });
+                    } else {
+                        queueRequest(ER, "xsrf_token=" + XSRFToken + "&do=entry_delete&code=" + Matches[I].parentElement.querySelector("[name='code']").value, "/ajax.php", function() {
+                            setTimeout(checkEREntry, 0, ++I, N, Matches, ER, Context, Callback);
+                        });
+                    }
+                } else {
+                    setTimeout(checkEREntry, 0, ++I, N, Matches, ER, Context, Callback);
                 }
             } else {
                 setTimeout(checkEREntry, 0, ++I, N, Matches, ER, Context, Callback);
