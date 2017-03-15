@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.20.3
+// @version 4.21
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -282,6 +282,9 @@
         NRF: {
             Name: "Not Received Finder"
         },
+        LUC: {
+            Name: "Level Up Calculator"
+        },
         UGD: {
             Name: "User Giveaways Data"
         },
@@ -544,6 +547,8 @@
                         addNRFButton(Sent, User);
                     }
                 }
+            } else if (GM_getValue("LUC") && Matches[I].textContent.match(/Contributor Level/)) {
+                calculateLUCValue(Matches[I]);
             }
         }
         if (GM_getValue("SWR")) {
@@ -1856,7 +1861,7 @@
         SMGiveawayFeatures = ["GTS", "SGG", "AGS", "EGF", "ELGB", "GDCBP", "GWC", "GGP", "GWL", "DGN", "UGS", "ER"];
         SMDiscussionFeatures = ["ADOT", "DH", "MPP", "DED"];
         SMCommentingFeatures = ["CH", "CT", "CFH", "MCBP", "MR", "RFI", "RML"];
-        SMUserFeatures = ["UH", "PUN", "RWSCVL", "SWR", "SGPB", "STPB", "SGC", "PUT", "WBH", "WBC", "NAMWC", "NRF", "UGD", "IWH", "AP"];
+        SMUserFeatures = ["UH", "PUN", "RWSCVL", "SWR", "SGPB", "STPB", "SGC", "PUT", "WBH", "WBC", "NAMWC", "NRF", "UGD", "LUC", "IWH", "AP"];
         SMGameFeatures = ["EGH", "GT"];
         SMOtherFeatures = ["FCH", "BSH", "MT", "GH", "GS", "AS", "SM_D"];
         for (ID in Features) {
@@ -4860,7 +4865,7 @@
     }
 
     function getUGDGiveaways(UGD, User, NextPage, CurrentPage, CurrentContext, URL, Callback, Context) {
-        var Giveaways, I, NumGiveaways, Giveaway, Timestamp, Received, Data, Heading, Match, Matches, Links, J, NumLinks, Text, Found, Pagination;
+        var Giveaways, I, NumGiveaways, Giveaway, Timestamp, Received, Data, Heading, SteamButton, Match, Matches, Links, J, NumLinks, Text, Found, Pagination;
         if (Context) {
             Giveaways = Context.getElementsByClassName("giveaway__summary");
             for (I = 0, NumGiveaways = Giveaways.length; I < NumGiveaways; ++I) {
@@ -4876,45 +4881,48 @@
                     if (Timestamp < User.UGD[UGD.Key + "Timestamp"]) {
                         Data = {};
                         Heading = Giveaway.getElementsByClassName("giveaway__heading")[0];
-                        Match = Heading.getElementsByClassName("giveaway__heading__name")[0];
-                        Data.Code = Match.getAttribute("href");
-                        Data.Code = Data.Code ? Data.Code.match(/\/giveaway\/(.+?)\//)[1] : "";
-                        Data.Name = Match.textContent;
-                        Matches = Heading.getElementsByClassName("giveaway__heading__thin");
-                        if (Matches.length > 1) {
-                            Data.Copies = parseInt(Matches[0].textContent.replace(/,/, "").match(/\d+/)[0]);
-                            Data.Points = parseInt(Matches[1].textContent.replace(/,/, "").match(/\d+/)[0]);
-                        } else {
-                            Data.Copies = 1;
-                            Data.Points = parseInt(Matches[0].textContent.replace(/,/, "").match(/\d+/)[0]);
-                        }
-                        Data.ID = parseInt(Heading.querySelector("[href*='store.steampowered.com']").getAttribute("href").match(/\d+/)[0]);
-                        if (UGD.Key == "Won") {
-                            Data.Creator = Giveaway.getElementsByClassName("giveaway__username")[0].textContent;
-                        }
-                        Data.Level = Giveaway.getElementsByClassName("giveaway__column--contributor-level")[0];
-                        Data.Level = Data.Level ? parseInt(Data.Level.textContent.match(/\d+/)[0]) : 0;
-                        Data.Private = Giveaway.getElementsByClassName("giveaway__column--invite-only")[0];
-                        Data.Private = Data.Private ? true : false;
-                        Data.Group = Giveaway.getElementsByClassName("giveaway__column--group")[0];
-                        Data.Group = Data.Group ? true : false;
-                        Data.Whitelist = Giveaway.getElementsByClassName("giveaway__column--whitelist")[0];
-                        Data.Whitelist = Data.Whitelist ? true : false;
-                        Data.Region = Giveaway.getElementsByClassName("giveaway__column--region-restricted")[0];
-                        Data.Region = Data.Region ? true : false;
-                        Links = Giveaway.getElementsByClassName("giveaway__links")[0].children;
-                        for (J = 0, NumLinks = Links.length; J < NumLinks; ++J) {
-                            Text = Links[J].textContent;
-                            if (Text.match(/(entry|entries)/)) {
-                                Data.Entries = parseInt(Text.replace(/,/g, "").match(/\d+/)[0]);
-                            } else if (Text.match(/comment/)) {
-                                Data.Comments = parseInt(Text.replace(/,/g, "").match(/\d+/)[0]);
+                        SteamButton = Heading.querySelector("[href*='store.steampowered.com']");
+                        if (SteamButton) {
+                            Match = Heading.getElementsByClassName("giveaway__heading__name")[0];
+                            Data.Code = Match.getAttribute("href");
+                            Data.Code = Data.Code ? Data.Code.match(/\/giveaway\/(.+?)\//)[1] : "";
+                            Data.Name = Match.textContent;
+                            Matches = Heading.getElementsByClassName("giveaway__heading__thin");
+                            if (Matches.length > 1) {
+                                Data.Copies = parseInt(Matches[0].textContent.replace(/,/, "").match(/\d+/)[0]);
+                                Data.Points = parseInt(Matches[1].textContent.replace(/,/, "").match(/\d+/)[0]);
+                            } else {
+                                Data.Copies = 1;
+                                Data.Points = parseInt(Matches[0].textContent.replace(/,/, "").match(/\d+/)[0]);
                             }
+                            Data.ID = parseInt(SteamButton.getAttribute("href").match(/\d+/)[0]);
+                            if (UGD.Key == "Won") {
+                                Data.Creator = Giveaway.getElementsByClassName("giveaway__username")[0].textContent;
+                            }
+                            Data.Level = Giveaway.getElementsByClassName("giveaway__column--contributor-level")[0];
+                            Data.Level = Data.Level ? parseInt(Data.Level.textContent.match(/\d+/)[0]) : 0;
+                            Data.Private = Giveaway.getElementsByClassName("giveaway__column--invite-only")[0];
+                            Data.Private = Data.Private ? true : false;
+                            Data.Group = Giveaway.getElementsByClassName("giveaway__column--group")[0];
+                            Data.Group = Data.Group ? true : false;
+                            Data.Whitelist = Giveaway.getElementsByClassName("giveaway__column--whitelist")[0];
+                            Data.Whitelist = Data.Whitelist ? true : false;
+                            Data.Region = Giveaway.getElementsByClassName("giveaway__column--region-restricted")[0];
+                            Data.Region = Data.Region ? true : false;
+                            Links = Giveaway.getElementsByClassName("giveaway__links")[0].children;
+                            for (J = 0, NumLinks = Links.length; J < NumLinks; ++J) {
+                                Text = Links[J].textContent;
+                                if (Text.match(/(entry|entries)/)) {
+                                    Data.Entries = parseInt(Text.replace(/,/g, "").match(/\d+/)[0]);
+                                } else if (Text.match(/comment/)) {
+                                    Data.Comments = parseInt(Text.replace(/,/g, "").match(/\d+/)[0]);
+                                }
+                            }
+                            if (!User.UGD[UGD.Key][Data.ID]) {
+                                User.UGD[UGD.Key][Data.ID] = [];
+                            }
+                            User.UGD[UGD.Key][Data.ID].push(Data);
                         }
-                        if (!User.UGD[UGD.Key][Data.ID]) {
-                            User.UGD[UGD.Key][Data.ID] = [];
-                        }
-                        User.UGD[UGD.Key][Data.ID].push(Data);
                     } else {
                         Found = true;
                         break;
@@ -4944,6 +4952,23 @@
                 getUGDGiveaways(UGD, User, ++NextPage, CurrentPage, CurrentContext, URL, Callback, document);
             }
         }
+    }
+
+    // [LUC] Level Up Calculator
+
+    function calculateLUCValue(Context) {
+        var Level, Base, Values, Lower, Upper, Value;
+        Context = Context.nextElementSibling;
+        Level = parseFloat(Context.firstElementChild.getAttribute("title"));
+        Base = parseInt(Level);
+        if (Base < 10) {
+            Values = [0, 0.01, 25.01, 50.01, 100.01, 250.01, 500.01, 1000.01, 2000.01, 3000.01, 5000.01];
+            Lower = Values[Base];
+            Upper = Values[Base + 1];
+            Value = Math.round((Upper - (Lower + (Lower * (Level - Base)))) * 100) / 100;
+            Context.insertAdjacentHTML("beforeEnd", " <span>(~ $" + Value + " real CV to level " + (Base + 1) + ".)");
+        }
+
     }
 
     // [SWR] Sent / Won Ratio

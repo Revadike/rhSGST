@@ -318,6 +318,14 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 * Lists the most given away games for sent checks and the users most won from for won checks.
 * The data is not 100% accurate if the user has not received giveaways.
 
+### Level Up Calculator
+
+`steamgifts.com/user/*`
+
+![](http://i.imgur.com/eTBR402.png)
+
+* Approximately calculates how much real CV an user needs to level up.
+
 ### Inbox Winners Highlighter
 
 `steamgifts.com/messages`
