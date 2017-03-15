@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.21
+// @version 4.21.1
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -4965,7 +4965,7 @@
             Values = [0, 0.01, 25.01, 50.01, 100.01, 250.01, 500.01, 1000.01, 2000.01, 3000.01, 5000.01];
             Lower = Values[Base];
             Upper = Values[Base + 1];
-            Value = Math.round((Upper - (Lower + (Lower * (Level - Base)))) * 100) / 100;
+            Value = Math.round((Upper - (Lower + ((Upper - Lower) * (Level - Base)))) * 100) / 100;
             Context.insertAdjacentHTML("beforeEnd", " <span>(~ $" + Value + " real CV to level " + (Base + 1) + ".)");
         }
 
