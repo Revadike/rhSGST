@@ -271,6 +271,7 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 ![](http://i.imgur.com/Shwsgdh.png)
 
 * Adds links to an user's SGTools real won / sent CV pages.
+* Has an option to automatically load the real CV and show it on the profile.
 
 ### Sent / Won Ratio
 

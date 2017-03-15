@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 4.20.2
+// @version 4.20.3
 // @downloadURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js
 // @updateURL https://github.com/revilheart/rhSGST/raw/master/rhSGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -241,6 +241,9 @@
             Name: "Real Won / Sent CV Links",
             RWSCVL_RO: {
                 Name: "Reverse order (from new to old)."
+            },
+            RWSCVL_AL: {
+                Name: "Automatically load real CV and show it on the profile."
             }
         },
         SWR: {
@@ -490,40 +493,61 @@
     }
 
     function loadProfileFeatures(Context) {
-        var Heading, Username, ID, SteamButton, SteamID64;
+        var Heading, SteamButton, User;
         Heading = Context.getElementsByClassName(SG ? "featured__heading" : "page_heading")[0];
-        Username = SG ? Heading.textContent : "";
-        ID = Context.querySelector("[name='child_user_id']");
-        ID = ID ? ID.value : "";
         SteamButton = Context.querySelector("a[href*='/profiles/']");
-        SteamID64 = SteamButton.getAttribute("href").match(/\d+/)[0];
+        User = {};
+        User.ID = Context.querySelector("[name='child_user_id']");
+        User.ID = User.ID ? User.ID.value : "";
+        User.SteamID64 = SteamButton.getAttribute("href").match(/\d+/)[0];
+        User.Username = SG ? Heading.textContent : "";
         if (SG) {
-            if (GM_getValue("STPB")) {
-                addSTPBButton(Context, SteamID64);
-            }
             if (GM_getValue("UH")) {
-                addUHContainer(Heading, SteamID64, Username);
+                addUHContainer(Heading, User);
             }
-            if (GM_getValue("SWR")) {
-                addSWRRatio(Context, Username);
+            if (GM_getValue("STPB")) {
+                addSTPBButton(Context, User);
             }
-            if (GM_getValue("RWSCVL")) {
-                addRWSCVLLinks(Context, Username);
-            }
-            if (GM_getValue("NAMWC")) {
-                addNAMWCProfileButton(Context, Username, ID, SteamID64);
-            }
-            if (GM_getValue("NRF")) {
-                addNRFButton(Context, Username, ID, SteamID64);
+            if (GM_getValue("SGC") && (User.Username != GM_getValue("Username"))) {
+                addSGCContainer(Context, User);
             }
         } else if (GM_getValue("SGPB")) {
-            addSGPBButton(SteamID64, SteamButton);
+            addSGPBButton(User, SteamButton);
         }
         if (GM_getValue("PUN")) {
-            addPUNButton(Heading, Username, ID, SteamID64);
+            addPUNButton(Heading, User);
         }
-        if (GM_getValue("SGC") && (Username != GM_getValue("Username"))) {
-            addSGCContainer(Context, SteamID64);
+        loadWonSentFeatures(Context, User);
+    }
+
+    function loadWonSentFeatures(Context, User) {
+        var Matches, I, N, Match, Key, Won, Sent;
+        Matches = Context.getElementsByClassName("featured__table__row__left");
+        for (I = 0, N = Matches.length; I < N; ++I) {
+            Match = Matches[I].textContent.match(/Gifts (Won|Sent)/);
+            if (Match) {
+                Key = Match[1];
+                if (GM_getValue("RWSCVL")) {
+                    addRWSCVLLink(Matches[I], Key, User);
+                }
+                if (GM_getValue("UGD")) {
+                    addUGDButton(Matches[I], Key, User);
+                }
+                if (Key == "Won") {
+                    Won = Matches[I];
+                    if (GM_getValue("NAMWC")) {
+                        addNAMWCProfileButton(Won, User);
+                    }
+                } else {
+                    Sent = Matches[I];
+                    if (GM_getValue("NRF")) {
+                        addNRFButton(Sent, User);
+                    }
+                }
+            }
+        }
+        if (GM_getValue("SWR")) {
+            addSWRRatio(Won, Sent, User);
         }
     }
 
@@ -632,10 +656,6 @@
             Check: GM_getValue("NAMWC") && SG && Object.keys(CurrentUsers).length && Path.match(/\/winners/),
             Name: "NAMWCButton",
             Callback: addNAMWCButton
-        }, {
-            Check: GM_getValue("UGD") && SG && Path.match(/^\/user\//),
-            Name: "UGDButton",
-            Callback: addUGDButton
         }, {
             Check: GM_getValue("WBC") && SG && Object.keys(CurrentUsers).length,
             Name: "WBCButton",
@@ -2866,13 +2886,13 @@
 
     // SGPB - SteamGifts Profile Button
 
-    function addSGPBButton(SteamID64, SteamButton) {
+    function addSGPBButton(User, SteamButton) {
         var Context;
         Context = document.getElementsByClassName("profile_links")[0];
         Context.insertAdjacentHTML(
             "beforeEnd",
             "<div class=\"profile_reputation\">" +
-            "    <a class=\"btn_action white SGPBButton\" href=\"https://www.steamgifts.com/go/user/" + SteamID64 + "\" rel=\"nofollow\" target=\"_blank\">" +
+            "    <a class=\"btn_action white SGPBButton\" href=\"https://www.steamgifts.com/go/user/" + User.SteamID64 + "\" rel=\"nofollow\" target=\"_blank\">" +
             "        <i class=\"fa\">" +
             "            <img src=\"https://cdn.steamgifts.com/img/favicon.ico\"/>" +
             "        </i>" +
@@ -2886,12 +2906,12 @@
 
     // STPB - SteamTrades Profile Button
 
-    function addSTPBButton(Context, SteamID64) {
+    function addSTPBButton(Context, User) {
         var STPBButton;
         Context = Context.getElementsByClassName("sidebar__shortcut-inner-wrap")[0];
         Context.insertAdjacentHTML(
             "beforeEnd",
-            "<a class=\"STPBButton\" href=\"https://www.steamtrades.com/user/" + SteamID64 + "\" rel=\"nofollow\" target=\"_blank\">" +
+            "<a class=\"STPBButton\" href=\"https://www.steamtrades.com/user/" + User.SteamID64 + "\" rel=\"nofollow\" target=\"_blank\">" +
             "    <i class=\"fa fa-fw\">" +
             "        <img src=\"https://cdn.steamtrades.com/img/favicon.ico\"/>" +
             "    </i>" +
@@ -2912,7 +2932,7 @@
 
     // SGC - Shared Groups Checker
 
-    function addSGCContainer(Context, SteamID64) {
+    function addSGCContainer(Context, User) {
         var SGCContainer, SGCButton, SGCBox;
         Context = Context.getElementsByClassName("sidebar__shortcut-inner-wrap")[0];
         Context.insertAdjacentHTML(
@@ -2948,7 +2968,7 @@
                     return !SGCContainer.contains(Target);
                 };
                 SGCBox.popOut(SGCContainer);
-                makeRequest(null, "http://www.steamcommunity.com/profiles/" + SteamID64 + "/groups", SGCBox.Popout, function(Response) {
+                makeRequest(null, "http://www.steamcommunity.com/profiles/" + User.SteamID64 + "/groups", SGCBox.Popout, function(Response) {
                     var ResponseHTML, Matches, Groups, I, NumMatches, Name, J, NumGroups, Avatar;
                     SGCBox.Popout.innerHTML = "<div class=\"giveaway__heading__name\">Shared Groups</div>";
                     ResponseHTML = parseHTML(Response.responseText);
@@ -2990,11 +3010,10 @@
 
     // UH - Username History
 
-    function addUHContainer(Context, SteamID64, Username) {
+    function addUHContainer(Context, User) {
         var UHContainer, UHButton, UHBox, UHList, URL;
-        Context = Context.getElementsByClassName("featured__heading__medium")[0];
         Context.insertAdjacentHTML(
-            "afterEnd",
+            "beforeEnd",
             "<div class=\"UHContainer\">" +
             "    <a class=\"UHButton\">" +
             "        <i class=\"fa fa-caret-down\"></i>" +
@@ -3006,7 +3025,7 @@
             "    </div>" +
             "</div>"
         );
-        UHContainer = Context.nextElementSibling;
+        UHContainer = Context.lastElementChild;
         UHButton = UHContainer.firstElementChild;
         UHBox = UHButton.nextElementSibling;
         UHList = UHBox.lastElementChild;
@@ -3016,7 +3035,7 @@
                 UHList.innerHTML =
                     "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
                     "<span>Loading usernames...</span>";
-                URL = "https://script.google.com/macros/s/AKfycbzvOuHG913mRIXOsqHIeAuQUkLYyxTHOZim5n8iP-k80iza6g0/exec?Action=1&SteamID64=" + SteamID64 + "&Username=" + Username;
+                URL = "https://script.google.com/macros/s/AKfycbzvOuHG913mRIXOsqHIeAuQUkLYyxTHOZim5n8iP-k80iza6g0/exec?Action=1&SteamID64=" + User.SteamID64 + "&Username=" + User.Username;
                 makeRequest(null, URL, UHList, function(Response) {
                     UHList.innerHTML = "<li>" + parseJSON(Response.responseText).Usernames.join("</li><li>") + "</li>";
                 });
@@ -3047,8 +3066,8 @@
 
     // Permanent User Notes
 
-    function addPUNButton(Context, Username, ID, SteamID64) {
-        var PUNButton, UserID, User, PUNIcon, SavedUser;
+    function addPUNButton(Context, User) {
+        var PUNButton, UserID, PUNIcon, SavedUser;
         Context.insertAdjacentHTML(
             SG ? "beforeEnd" : "afterBegin",
             "<a class=\"page_heading_btn PUNButton\">" +
@@ -3056,12 +3075,7 @@
             "</a>"
         );
         PUNButton = Context[SG ? "lastElementChild" : "firstElementChild"];
-        UserID = SG ? Username : SteamID64;
-        User = {
-            Username: Username,
-            ID: ID,
-            SteamID64: SteamID64
-        };
+        UserID = SG ? User.Username : User.SteamID64;
         PUNIcon = PUNButton.firstElementChild;
         SavedUser = getUser(User);
         PUNIcon.classList.add((SavedUser && SavedUser.Notes) ? "fa-sticky-note" : "fa-sticky-note-o");
@@ -4081,66 +4095,41 @@
         }
     }
 
-    // Real Won / Sent CV Links
+    // [RWSCVL] Real Won / Sent CV Links
 
-    function addRWSCVLLinks(Context, Username) {
-        var Matches, I, N, Match;
-        Matches = Context.getElementsByClassName("featured__table__row__left");
-        for (I = 0, N = Matches.length; I < N; ++I) {
-            Match = Matches[I].textContent.match(/Gifts (Won|Sent)/);
-            if (Match) {
-                Matches[I].innerHTML = "<a class=\"RWSCVLLink\" href=\"http://www.sgtools.info/" + Match[1].toLowerCase() + "/" + Username + (GM_getValue("RWSCVL_RO") ? "/newestfirst" : "") +
-                    "\" target=\"_blank\">" + Match[0] + "</a>";
-            }
+    function addRWSCVLLink(Context, Key, User) {
+        var URL, RWSCVL;
+        URL = "http://www.sgtools.info/" + Key.toLowerCase() + "/" + User.Username;
+        Context.innerHTML = "<a class=\"RWSCVLLink\" href=\"" + URL + (GM_getValue("RWSCVL_RO") ? "/newestfirst" : "") +
+            "\" target=\"_blank\">Gifts " + Key + "</a>";
+        if (GM_getValue("RWSCVL_AL")) {
+            Context = (Key == "Won") ? Context.nextElementSibling : Context.nextElementSibling.firstElementChild;
+            Context.insertAdjacentHTML(
+                "beforeEnd",
+                " <span>" +
+                "    <i class=\"fa fa-circle-o-notch fa-spin\"></i>" +
+                "</span>"
+            );
+            RWSCVL = {
+                Progress: Context.lastElementChild
+            };
+            queueRequest(RWSCVL, null, URL, function(Response) {
+                RWSCVL.Progress.remove();
+                Context.insertAdjacentText("beforeEnd", " ($" + parseHTML(Response.responseText).getElementById("data").textContent.replace(/\s\$/, "") + " Real CV)");
+            });
         }
     }
 
-    // SWR - Sent / Won Ratio
+    // [NAMWC] Not Activated / Multiple Wins Checker
 
-    function addSWRRatio(Context, Username) {
-        var Matches, I, N, Won, Sent, Ratio;
-        Matches = Context.getElementsByClassName("featured__table__row__left");
-        for (I = 0, N = Matches.length; I < N; ++I) {
-            if (Matches[I].textContent.match(/Gifts Won/)) {
-                Won = Matches[I].parentElement;
-                Sent = Won.nextElementSibling;
-                Context = Sent;
-                break;
-            }
-        }
-        Won = parseInt(Won.lastElementChild.firstElementChild.textContent.replace(/,/, ""));
-        Sent = parseInt(Sent.lastElementChild.firstElementChild.firstElementChild.textContent.replace(/,/, ""));
-        Ratio = (Won > 0) ? (Math.round(Sent / Won * 100) / 100) : 0;
+    function addNAMWCProfileButton(Context, User) {
         Context.insertAdjacentHTML(
-            "afterEnd",
-            "<div class=\"featured__table__row SWRRatio\">" +
-            "    <div class=\"featured__table__row__left\">Ratio</div>" +
-            "    <div class=\"featured__table__row__right\" title=\"" + Username + " has sent " + Ratio + " gifts for every gift won.\">" + Ratio + "</div>" +
-            "</div>"
+            "beforeEnd",
+            " <span class=\"NAMWCButton\">" +
+            "    <i class=\"fa fa-question-circle\" title=\"Check for not activated / multiple wins.\"></i>" +
+            "</span>"
         );
-    }
-
-    // Not Activated / Multiple Wins Checker
-
-    function addNAMWCProfileButton(Context, Username, ID, SteamID64) {
-        var Matches, I, N;
-        Matches = Context.getElementsByClassName("featured__table__row__left");
-        for (I = 0, N = Matches.length; I < N; ++I) {
-            if (Matches[I].textContent == "Gifts Won") {
-                Matches[I].insertAdjacentHTML(
-                    "beforeEnd",
-                    " <span class=\"NAMWCButton\">" +
-                    "    <i class=\"fa fa-question-circle\" title=\"Check for not activated / multiple wins.\"></i>" +
-                    "</span>"
-                );
-                break;
-            }
-        }
-        setNAMWCPopup(Context, {
-            Username: Username,
-            ID: ID,
-            SteamID64: SteamID64
-        });
+        setNAMWCPopup(Context, User);
     }
 
     function addNAMWCButton(Context) {
@@ -4452,33 +4441,23 @@
         }
     }
 
-    // Not Received Finder
+    // [NRF] Not Received Finder
 
-    function addNRFButton(Context, Username, ID, SteamID64) {
-        var Matches, I, N, NRF;
-        Matches = Context.getElementsByClassName("featured__table__row__left");
-        for (I = 0, N = Matches.length; I < N; ++I) {
-            if (Matches[I].textContent == "Gifts Sent") {
-                NRF = {
-                    N: parseInt(Matches[I].nextElementSibling.firstElementChild.getAttribute("title").match(/, (.+) Not Received/)[1])
-                };
-                if (NRF.N > 0) {
-                    NRF.I = 0;
-                    NRF.Multiple = [];
-                    Matches[I].insertAdjacentHTML(
-                        "beforeEnd",
-                        " <span class=\"NRFButton\">" +
-                        "    <i class=\"fa fa-times-circle\" title=\"Find not received giveaways.\"></i>" +
-                        "</span>"
-                    );
-                    setNRFPopup(NRF, Matches[I].lastElementChild, {
-                        Username: Username,
-                        ID: ID,
-                        SteamID64
-                    });
-                }
-                break;
-            }
+    function addNRFButton(Context, User) {
+        var NRF;
+        NRF = {
+            N: parseInt(Context.nextElementSibling.firstElementChild.getAttribute("title").match(/, (.+) Not Received/)[1])
+        };
+        if (NRF.N > 0) {
+            NRF.I = 0;
+            NRF.Multiple = [];
+            Context.insertAdjacentHTML(
+                "beforeEnd",
+                " <span class=\"NRFButton\">" +
+                "    <i class=\"fa fa-times-circle\" title=\"Find not received giveaways.\"></i>" +
+                "</span>"
+            );
+            setNRFPopup(NRF, Context.lastElementChild, User);
         }
     }
 
@@ -4657,26 +4636,20 @@
         }
     }
 
-    // UGD - User Giveaways Data
+    // [UGD] User Giveaways Data
 
-    function addUGDButton(Context) {
-        var UGD, User, UGDButton, Popup;
+    function addUGDButton(Context, Key, User) {
+        var UGD, UGDButton, Popup;
         UGD = {
-            Key: Path.match(/\/giveaways\/won/) ? "Won" : "Sent"
+            Key: Key
         };
-        User = {
-            SteamID64: document.querySelector("a[href*='/profiles/']").href.match(/\d+/)[0],
-            Username: document.getElementsByClassName("featured__heading__medium")[0].textContent
-        };
-        User.ID = (User.Username != GM_getValue("Username")) ? document.querySelector("[name='child_user_id']").value : "";
         Context.insertAdjacentHTML(
-            "afterBegin",
-            "<a class=\"UGDButton\" title=\"Get giveaways data.\">" +
-            "    <i class=\"fa " + ((UGD.Key == "Sent") ? "fa-gift" : "fa-trophy") + "\"></i>" +
+            "beforeEnd",
+            " <span class=\"UGDButton\" title=\"Get " + UGD.Key.toLowerCase() + " giveaways data.\">" +
             "    <i class=\"fa fa-bar-chart\"></i>" +
-            "</a>"
+            "</span>"
         );
-        UGDButton = Context.firstElementChild;
+        UGDButton = Context.lastElementChild;
         Popup = createPopup();
         Popup.Icon.classList.add("fa-bar-chart");
         Popup.Title.textContent = "Get " + User.Username + "'s " + UGD.Key.toLowerCase() + " giveaways data:";
@@ -4685,7 +4658,7 @@
             UGDButton.classList.add("rhBusy");
             queueSave(UGD, function() {
                 saveUser(User, UGD, function() {
-                    var Match;
+                    var Match, CurrentPage;
                     GM_setValue("LastSave", 0);
                     User.UGD = getUser(User).UGD;
                     if (!User.UGD) {
@@ -4696,8 +4669,10 @@
                             WonTimestamp: 0
                         };
                     }
-                    Match = Location.match(/page=(\d+)/);
-                    getUGDGiveaways(UGD, User, 1, Match ? parseInt(Match[1]) : 1, "/user/" + User.Username + ((UGD.Key == "Won") ? "/giveaways/won" : "") + "/search?page=", function() {
+                    Match = Path.match(new RegExp("^\/user\/" + User.Username + ((UGD.Key == "Won") ? "/giveaways/won" : "")));
+                    CurrentPage = Location.match(/page=(\d+)/);
+                    CurrentPage = Match ? (CurrentPage ? parseInt(CurrentPage[1]) : 1) : 0;
+                    getUGDGiveaways(UGD, User, 1, CurrentPage, Match, "/user/" + User.Username + ((UGD.Key == "Won") ? "/giveaways/won" : "") + "/search?page=", function() {
                         queueSave(UGD, function() {
                             saveUser(User, UGD, function() {
                                 var Giveaways, Types, TypesTotal, LevelsTotal, Total, Frequencies, Key, I, N, Giveaway, Private, Group, Whitelist, Region, Level, Copies, Value, HTML, Type,
@@ -4884,7 +4859,7 @@
         });
     }
 
-    function getUGDGiveaways(UGD, User, NextPage, CurrentPage, URL, Callback, Context) {
+    function getUGDGiveaways(UGD, User, NextPage, CurrentPage, CurrentContext, URL, Callback, Context) {
         var Giveaways, I, NumGiveaways, Giveaway, Timestamp, Received, Data, Heading, Match, Matches, Links, J, NumLinks, Text, Found, Pagination;
         if (Context) {
             Giveaways = Context.getElementsByClassName("giveaway__summary");
@@ -4948,7 +4923,7 @@
             }
             Pagination = Context.getElementsByClassName("pagination__navigation")[0];
             if (!Found && Pagination && !Pagination.lastElementChild.classList.contains("is-selected")) {
-                getUGDGiveaways(UGD, User, NextPage, CurrentPage, URL, Callback);
+                getUGDGiveaways(UGD, User, NextPage, CurrentPage, CurrentContext, URL, Callback);
             } else {
                 User.UGD[UGD.Key + "Timestamp"] = UGD.Timestamp;
                 Callback();
@@ -4958,17 +4933,33 @@
                 "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
                 "<span>Retrieving giveaways (page " + NextPage + ")...</span>";
             if (CurrentPage != NextPage) {
-                if (!document.getElementById("ESPage" + NextPage)) {
-                    queueRequest(UGD, null, URL + NextPage, function(Response) {
-                        getUGDGiveaways(UGD, User, ++NextPage, CurrentPage, URL, Callback, parseHTML(Response.responseText));
-                    });
+                if (CurrentContext && document.getElementById("ESPage" + NextPage)) {
+                    getUGDGiveaways(UGD, User, ++NextPage, CurrentPage, CurrentContext, URL, Callback);
                 } else {
-                    getUGDGiveaways(UGD, User, ++NextPage, CurrentPage, URL, Callback);
+                    queueRequest(UGD, null, URL + NextPage, function(Response) {
+                        getUGDGiveaways(UGD, User, ++NextPage, CurrentPage, CurrentContext, URL, Callback, parseHTML(Response.responseText));
+                    });
                 }
             } else {
-                getUGDGiveaways(UGD, User, ++NextPage, CurrentPage, URL, Callback, document);
+                getUGDGiveaways(UGD, User, ++NextPage, CurrentPage, CurrentContext, URL, Callback, document);
             }
         }
+    }
+
+    // [SWR] Sent / Won Ratio
+
+    function addSWRRatio(Won, Sent, User) {
+        var WonCount, SentCount, Ratio;
+        WonCount = parseInt(Won.nextElementSibling.firstElementChild.textContent.replace(/,/, ""));
+        SentCount = parseInt(Sent.nextElementSibling.firstElementChild.firstElementChild.textContent.replace(/,/, ""));
+        Ratio = (WonCount > 0) ? (Math.round(SentCount / WonCount * 100) / 100) : 0;
+        Sent.parentElement.insertAdjacentHTML(
+            "afterEnd",
+            "<div class=\"featured__table__row SWRRatio\">" +
+            "    <div class=\"featured__table__row__left\">Ratio</div>" +
+            "    <div class=\"featured__table__row__right\" title=\"" + User.Username + " has sent " + Ratio + " gifts for every gift won.\">" + Ratio + "</div>" +
+            "</div>"
+        );
     }
 
     // Inbox Winners Highlighter
@@ -15186,7 +15177,7 @@
             "}" +
             ".APBox .featured__outer-wrap {" +
             "    padding: 5px;" +
-            "    width: 365px;" +
+            "    width: auto;" +
             "    white-space: normal;" +
             "}" +
             ".APBox .featured__inner-wrap, .MPPPostDefault {" +
