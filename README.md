@@ -1,10 +1,10 @@
-# rhSGST
+# ESGST - Enhanced SteamGifts & SteamTrades
 
 A script that adds some cool features to SteamGifts and SteamTrades.
 
 ## Installation
 
-To install the script, you must install [Tampermonkey](https://tampermonkey.net/) or [Greasemonkey](http://www.greasespot.net/) first. Then [click here](https://github.com/revilheart/rhSGST/raw/master/rhSGST.user.js) and you should be prompted to install it.
+To install the script, you must install [Tampermonkey](https://tampermonkey.net/) or [Greasemonkey](http://www.greasespot.net/) first. Then [click here](https://github.com/revilheart/ESGST/raw/master/ESGST.user.js) and you should be prompted to install it.
 
 ## Compatibility
 
