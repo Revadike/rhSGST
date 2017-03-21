@@ -20,7 +20,7 @@
 // @connect sgtools.info
 // @connect steamcommunity.com
 // @connect api.steampowered.com
-// @require https://github.com/rafaelgs18/rhSGST/raw/master/Features/FixedElements.v5.0.js
+// @require https://github.com/rafaelgs18/ESGST/raw/master/Features/FixedElements.v5.0.js
 // @require https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js
 // @require https://greasyfork.org/scripts/26575-bpopup/code/bPopup.js?version=169515
 // @require https://cdn.steamgifts.com/js/highcharts.js
