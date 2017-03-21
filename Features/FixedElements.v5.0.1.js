@@ -98,12 +98,14 @@ function fixFESidebar() {
     var FESidebar, Height, Container, Ad, Top;
     addFESidebarStyle();
     FESidebar = document.getElementsByClassName("sidebar")[0];
-    Height = document.getElementsByTagName("header")[0].offsetHeight + 25;
-    Container = FESidebar.nextElementSibling;
-    Ad = ESGST.GiveawayCommentsPath ? FESidebar.getElementsByClassName("sidebar__search-container")[0].nextElementSibling :
-        FESidebar.getElementsByClassName("sidebar__mpu")[0];
-    document.addEventListener("scroll", fixSidebar);
-    fixSidebar();
+    if (FESidebar) {
+        Height = document.getElementsByTagName("header")[0].offsetHeight + 25;
+        Container = FESidebar.nextElementSibling;
+        Ad = ESGST.GiveawayCommentsPath ? FESidebar.getElementsByClassName("sidebar__search-container")[0].nextElementSibling :
+            FESidebar.getElementsByClassName("sidebar__mpu")[0];
+        document.addEventListener("scroll", fixSidebar);
+        fixSidebar();
+    }
 
     function fixSidebar() {
         Top = FESidebar.offsetTop;
