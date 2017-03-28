@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 5.0.2
+// @version 5.0.3
 // @downloadURL https://github.com/rafaelgs18/ESGST/raw/master/ESGST.user.js
 // @updateURL https://github.com/rafaelgs18/ESGST/raw/master/ESGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -21,6 +21,7 @@
 // @connect steamcommunity.com
 // @connect api.steampowered.com
 // @require https://github.com/rafaelgs18/ESGST/raw/master/Features/FixedElements.v5.0.1.js
+// @require https://github.com/rafaelgs18/ESGST/raw/master/Features/UsernameHistory.v5.0.js
 // @require https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js
 // @require https://greasyfork.org/scripts/26575-bpopup/code/bPopup.js?version=169515
 // @require https://cdn.steamgifts.com/js/highcharts.js
@@ -432,6 +433,9 @@ function updateGroups() {
 
 function loadFeatures() {
     var CommentBox;
+    if (ESGST.UH) {
+        addUHStyle();
+    }
     if (SG) {
         addHMMenu();
     }
@@ -511,7 +515,7 @@ function loadProfileFeatures(Context) {
     User.SteamID64 = SteamButton.getAttribute("href").match(/\d+/)[0];
     User.Username = SG ? Heading.textContent : "";
     if (SG) {
-        if (GM_getValue("UH")) {
+        if (ESGST.UH) {
             addUHContainer(Heading, User);
         }
         if (GM_getValue("STPB")) {
@@ -1716,7 +1720,7 @@ function addHMMenu() {
             "    </a>" +
             "</div>"
         ))
-    )
+    );
     Context.lastElementChild.firstElementChild.addEventListener("click", function() {
         GM_setValue("BILGN", true);
     });
@@ -2940,46 +2944,6 @@ function addSGCButton(Context, User) {
                 loadEndlessFeatures(Popup.Results);
                 SGCPopup.reposition();
             });
-        }
-    });
-}
-
-// UH - Username History
-
-function addUHContainer(Context, User) {
-    var UHContainer, UHButton, UHBox, UHList, URL;
-    Context.insertAdjacentHTML(
-        "beforeEnd",
-        "<div class=\"UHContainer\">" +
-        "    <a class=\"UHButton\">" +
-        "        <i class=\"fa fa-caret-down\"></i>" +
-        "    </a>" +
-        "    <div class=\"featured__outer-wrap UHBox rhHidden\">" +
-        "        <div class=\"featured__table__row__left\">Username History</div>" +
-        "        <br/>" +
-        "        <ul class=\"featured__table__row__right UHList\"></ul>" +
-        "    </div>" +
-        "</div>"
-    );
-    UHContainer = Context.lastElementChild;
-    UHButton = UHContainer.firstElementChild;
-    UHBox = UHButton.nextElementSibling;
-    UHList = UHBox.lastElementChild;
-    UHButton.addEventListener("click", function() {
-        UHBox.classList.toggle("rhHidden");
-        if (!UHList.innerHTML) {
-            UHList.innerHTML =
-                "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
-                "<span>Loading usernames...</span>";
-            URL = "https://script.google.com/macros/s/AKfycbzvOuHG913mRIXOsqHIeAuQUkLYyxTHOZim5n8iP-k80iza6g0/exec?Action=1&SteamID64=" + User.SteamID64 + "&Username=" + User.Username;
-            makeRequest(null, URL, UHList, function(Response) {
-                UHList.innerHTML = "<li>" + parseJSON(Response.responseText).Usernames.join("</li><li>") + "</li>";
-            });
-        }
-    });
-    document.addEventListener("click", function(Event) {
-        if (!UHBox.classList.contains("rhHidden") && !UHContainer.contains(Event.target)) {
-            UHBox.classList.add("rhHidden");
         }
     });
 }
@@ -14918,7 +14882,7 @@ function addStyles() {
         "    margin: 5px 0 15px;" +
         "    padding: 0;" +
         "}" +
-        ".ESPanel >*:not(:last-child), .APBox .featured__table__row__left, .MRReply, .MREdit {" +
+        ".ESPanel >*:not(:last-child), .APBox .featured__table__row__left:not(.UHTitle), .MRReply, .MREdit {" +
         "    margin: 0 10px 0 0;" +
         "}" +
         ".ESStatus {" +
@@ -14986,7 +14950,7 @@ function addStyles() {
         "    float: none;" +
         "}" +
         ".SMManageData, .SMRecentUsernameChanges, .SMCommentHistory, .SMManageTags, .ESPanel .pagination__navigation >*, .ESPanel .pagination_navigation >*, .ESRefresh, .ESPause," +
-        ".UHButton, .PUNButton, .MTButton, .MTAll, .MTNone, .MTInverse, .WBCButton, .NAMWCButton, .NRFButton, .UGDButton, .GTSView, .UGSButton, .GDCBPButton, .CTGoToUnread, .CTMarkRead," +
+        ".PUNButton, .MTButton, .MTAll, .MTNone, .MTInverse, .WBCButton, .NAMWCButton, .NRFButton, .UGDButton, .GTSView, .UGSButton, .GDCBPButton, .CTGoToUnread, .CTMarkRead," +
         ".CTMarkVisited, .MCBPButton, .MPPButton, .ASButton {" +
         "    cursor: pointer;" +
         "    display: inline-block;" +
@@ -14998,17 +14962,7 @@ function addStyles() {
         ".SGCBox .table__row-inner-wrap, .GGPBox .table__row-inner-wrap {" +
         "    padding: 0 10px;" +
         "}" +
-        ".UHBox {" +
-        "    background-position: center;" +
-        "    margin: 5px 0 0;" +
-        "    max-height: 75px;" +
-        "    overflow: auto;" +
-        "    padding: 10px;" +
-        "    position: absolute;" +
-        "    text-align: center;" +
-        "    width: 150px !important;" +
-        "}" +
-        ".UHBox .featured__table__row__left, .PUTButton i, .MTUserCheckbox i, .MTGameCheckbox i, .CFHPanel span >:first-child >* {" +
+        ".PUTButton i, .MTUserCheckbox i, .MTGameCheckbox i, .CFHPanel span >:first-child >* {" +
         "    margin: 0 !important;" +
         "}" +
         ".PUTButton, .GTButton {" +
@@ -15076,7 +15030,7 @@ function addStyles() {
         ".IWHIcon {" +
         "    margin: 0 0 0 5px;" +
         "}" +
-        ".APBox .featured__outer-wrap {" +
+        ".APBox .featured__outer-wrap:not(.UHBox) {" +
         "    padding: 5px;" +
         "    width: auto;" +
         "    white-space: normal;" +
