@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 5.0.1
+// @version 5.0.2
 // @downloadURL https://github.com/rafaelgs18/ESGST/raw/master/ESGST.user.js
 // @updateURL https://github.com/rafaelgs18/ESGST/raw/master/ESGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -68,7 +68,7 @@ Features = {
             Name: "Enable in discussions / support / trades pages."
         },
         ES_DC: {
-            Name: "Enable in dicussion / support / trade comments pages."
+            Name: "Enable in discussion / support / trade comments pages."
         },
         ES_R: {
             Name: "Enable in the rest of the pages."
@@ -126,7 +126,7 @@ Features = {
         Name: "Giveaway Winning Chance"
     },
     GGP: {
-        Name: "Giveaway Groups Popout"
+        Name: "Giveaway Groups Popup"
     },
     GWL: {
         Name: "Giveaway Winners Link"
@@ -495,7 +495,7 @@ function loadFeatures() {
     Games = {};
     APBoxes = {};
     loadEndlessFeatures(document);
-    if (GM_getValue("ADOT") && Path.match(/^\/($|giveaways(?!.+(wishlist|created|entered|won)))/)) {
+    if (GM_getValue("ADOT") && Path.match(/^\/($|giveaways(?!.+(new|wishlist|created|entered|won)))/)) {
         moveADOTDiscussions();
     }
     setTimeout(goToComment, 1000);
@@ -518,7 +518,7 @@ function loadProfileFeatures(Context) {
             addSTPBButton(Context, User);
         }
         if (GM_getValue("SGC") && (User.Username != GM_getValue("Username"))) {
-            addSGCContainer(Context, User);
+            addSGCButton(Context, User);
         }
     } else if (GM_getValue("SGPB")) {
         addSGPBButton(User, SteamButton);
@@ -1124,20 +1124,27 @@ function setSync(CurrentDate, Update, Callback) {
 function sync(Sync, Callback) {
     Sync.OverallProgress.innerHTML =
         "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
-        "<span>Syncing your username / avatar...</span>";
+        "<span>Syncing your username and avatar...</span>";
     if (SG) {
         GM_setValue("Username", document.getElementsByClassName("nav__avatar-outer-wrap")[0].href.match(/\/user\/(.+)/)[1]);
     }
     GM_setValue("Avatar", document.getElementsByClassName(SG ? "nav__avatar-inner-wrap" : "nav_avatar")[0].style.backgroundImage.match(/\("(.+)"\)/)[1]);
+    if (!GM_getValue("SteamID64") && GM_getValue("Username")) {
+        getSteamID64(Sync, function() {
+            continueSync(Sync, Callback);
+        });
+    } else {
+        continueSync(Sync, Callback);
+    }
+}
+
+function continueSync(Sync, Callback) {
     Sync.OverallProgress.innerHTML =
         "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
         "<span>Syncing your Steam groups...</span>";
     Sync.Groups = [];
     syncGroups(Sync, "/account/steam/groups/search?page=", 1, function() {
         GM_setValue("Groups", Sync.Groups);
-        Sync.OverallProgress.innerHTML =
-            "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
-            "<span>Syncing your whitelist / blacklist...</span>";
         syncWhitelistBlacklist(Sync, function() {
             syncOwnedGames(Sync, function() {
                 var CurrentDate;
@@ -1146,6 +1153,16 @@ function sync(Sync, Callback) {
                 Callback(CurrentDate);
             });
         });
+    });
+}
+
+function getSteamID64(Sync, Callback) {
+    Sync.OverallProgress.innerHTML =
+        "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
+        "<span>Retrieving your SteamID64...</span>";
+    makeRequest(null, "/user/" + GM_getValue("Username"), Sync.Progress, function(Response) {
+        GM_setValue("SteamID64", parseHTML(Response.responseText).querySelector("a[href*='/profiles/']").getAttribute("href").match(/\d+/)[0]);
+        Callback();
     });
 }
 
@@ -1177,7 +1194,13 @@ function syncWhitelistBlacklist(Sync, Callback) {
         Sync.Users = [];
         SavedUsers = GM_getValue("Users");
         clearWhitelistBlacklist(Sync, 0, SavedUsers.length, SavedUsers, function() {
+            Sync.OverallProgress.innerHTML =
+                "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
+                "<span>Syncing your whitelist...</span>";
             getWhitelistBlacklist(Sync, "/account/manage/whitelist/search?page=", 1, "Whitelisted", function() {
+                Sync.OverallProgress.innerHTML =
+                    "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
+                    "<span>Syncing your blacklist...</span>";
                 getWhitelistBlacklist(Sync, "/account/manage/blacklist/search?page=", 1, "Blacklisted", function() {
                     queueSave(Sync, function() {
                         updateUsers(Sync.Users);
@@ -1252,9 +1275,13 @@ function getWhitelistBlacklistUsers(Sync, I, N, Matches, Key, Callback) {
 
 function syncOwnedGames(Sync, Callback) {
     var SteamAPIKey, URL;
+    Sync.OverallProgress.innerHTML =
+        "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
+        "<span>Syncing your owned games...</span>";
     SteamAPIKey = GM_getValue("SteamAPIKey");
     if (SteamAPIKey) {
         URL = "http://api.steampowered.com/IPlayerService/GetOwnedGames/v0001/?key=" + SteamAPIKey + "&steamid=" + GM_getValue("SteamID64") + "&format=json";
+        console.log(URL);
         makeRequest(null, URL, Sync.Progress, function(Response) {
             var ResponseText, ResponseGames, N, OwnedGames, I;
             ResponseText = Response.responseText;
@@ -1682,8 +1709,17 @@ function addHMMenu() {
         "    <div class=\"nav__button nav__button--is-dropdown-arrow HMButton\">" +
         "        <i class=\"fa fa-angle-down\"></i>" +
         "    </div>" +
-        "</div>"
-    );
+        "</div>" + (GM_getValue("BILGN") ? "" : (
+            "<div class=\"nav__button-container\">" +
+            "    <a class=\"nav__button\" href=\"/giveaway/bilgN/\" target=\"_blank\">" +
+            "        <i class=\"fa fa-star\"></i>" +
+            "    </a>" +
+            "</div>"
+        ))
+    )
+    Context.lastElementChild.firstElementChild.addEventListener("click", function() {
+        GM_setValue("BILGN", true);
+    });
     HMBox = Context.getElementsByClassName("HMBox")[0];
     SMRecentUsernameChanges = Context.getElementsByClassName("SMRecentUsernameChanges")[0];
     SMCommentHistory = Context.getElementsByClassName("SMCommentHistory")[0];
@@ -2836,45 +2872,41 @@ function addSTPBButton(Context, User) {
 
 // SGC - Shared Groups Checker
 
-function addSGCContainer(Context, User) {
-    var SGCContainer, SGCButton, SGCBox;
+function addSGCButton(Context, User) {
+    var SGCButton, Popup;
     Context = Context.getElementsByClassName("sidebar__shortcut-inner-wrap")[0];
     Context.insertAdjacentHTML(
         "beforeEnd",
-        "<div class=\"SGCContainer\">" +
-        "    <a class=\"SGCButton\">" +
-        "        <i class=\"fa fa-fw fa-users\"></i>" +
-        "    </a>" +
+        "<div class=\"SGCButton\">" +
+        "    <i class=\"fa fa-fw fa-users\"></i>" +
         "</div>"
     );
-    SGCContainer = Context.lastElementChild;
-    SGCButton = SGCContainer.firstElementChild;
+    SGCButton = Context.lastElementChild;
     Context = document.getElementsByClassName("js-tooltip")[0];
     if (Context) {
-        SGCContainer.addEventListener("mouseenter", function() {
+        SGCButton.addEventListener("mouseenter", function() {
             Context.textContent = "Check Shared Groups";
-            setSiblingsOpacity(SGCContainer, "0.5");
+            setSiblingsOpacity(SGCButton, "0.5");
         });
-        SGCContainer.addEventListener("mouseleave", function() {
-            setSiblingsOpacity(SGCContainer, "1");
+        SGCButton.addEventListener("mouseleave", function() {
+            setSiblingsOpacity(SGCButton, "1");
         });
     }
-    SGCContainer.addEventListener("click", function() {
-        if (SGCBox) {
-            SGCBox.popOut(SGCContainer);
+    SGCButton.addEventListener("click", function() {
+        var SGCPopup;
+        if (Popup) {
+            Popup.popUp();
         } else {
-            SGCBox = createPopout(SGCContainer);
-            SGCBox.Popout.classList.add("SGCBox");
-            SGCBox.Popout.innerHTML =
+            Popup = createPopup();
+            Popup.Icon.classList.add("fa-users");
+            Popup.Title.textContent = "Shared Groups";
+            Popup.OverallProgress.innerHTML =
                 "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
                 "<span>Checking shared groups...</span>";
-            SGCBox.customRule = function(Target) {
-                return !SGCContainer.contains(Target);
-            };
-            SGCBox.popOut(SGCContainer);
-            makeRequest(null, "http://www.steamcommunity.com/profiles/" + User.SteamID64 + "/groups", SGCBox.Popout, function(Response) {
+            SGCPopup = Popup.popUp();
+            makeRequest(null, "http://www.steamcommunity.com/profiles/" + User.SteamID64 + "/groups", Popup.Progress, function(Response) {
                 var ResponseHTML, Matches, Groups, I, NumMatches, Name, J, NumGroups, Avatar;
-                SGCBox.Popout.innerHTML = "<div class=\"giveaway__heading__name\">Shared Groups</div>";
+                Popup.OverallProgress.innerHTML = "";
                 ResponseHTML = parseHTML(Response.responseText);
                 Matches = ResponseHTML.getElementsByClassName("linkTitle");
                 Groups = GM_getValue("Groups");
@@ -2883,9 +2915,9 @@ function addSGCContainer(Context, User) {
                     for (J = 0, NumGroups = Groups.length; (J < NumGroups) && (Groups[J].Name != Name); ++J);
                     if (J < NumGroups) {
                         Avatar = Matches[I].parentElement.previousElementSibling.firstElementChild.firstElementChild.firstElementChild.getAttribute("src");
-                        SGCBox.Popout.insertAdjacentHTML(
+                        Popup.Results.insertAdjacentHTML(
                             "beforeEnd",
-                            "<div class=\"table__row-outer-wrap\">" +
+                            "<li class=\"table__row-outer-wrap\">" +
                             "    <div class=\"table__row-inner-wrap\">" +
                             "        <div>" +
                             "            <span>" +
@@ -2898,15 +2930,15 @@ function addSGCContainer(Context, User) {
                             "            <a class=\"table__column__heading\" href=\"/group/" + Groups[J].Code + "/\">" + Groups[J].Name + "</a>" +
                             "        </div>" +
                             "    </div>" +
-                            "</div>"
+                            "</li>"
                         );
                     }
                 }
-                if (SGCBox.Popout.children.length == 1) {
-                    SGCBox.Popout.insertAdjacentHTML("beforeEnd", "<div>No shared groups found.</div>");
+                if (!Popup.Results.innerHTML) {
+                    Popup.Results.innerHTML = "<div>No shared groups found.</div>";
                 }
-                loadEndlessFeatures(SGCBox.Popout);
-                SGCBox.reposition(SGCContainer);
+                loadEndlessFeatures(Popup.Results);
+                SGCPopup.reposition();
             });
         }
     });
@@ -3429,6 +3461,7 @@ function addWBCButton(Context) {
         B: GM_getValue("WBC_B"),
         Username: GM_getValue("Username")
     };
+    Popup.Popup.classList.add("rhPopupLarge");
     Popup.Icon.classList.add(WBC.Update ? "fa-cog" : "fa-question");
     Popup.Title.textContent = (WBC.Update ? "Manage Whitelist / Blacklist Checker caches" : ("Check for whitelists" + (WBC.B ? " / blacklists" : ""))) + ":";
     if (Path.match(new RegExp("^\/user\/(?!" + WBC.Username + ")"))) {
@@ -4044,6 +4077,7 @@ function addNAMWCButton(Context) {
 function setNAMWCPopup(Context, User) {
     var Popup, NAMWC, NAMWCButton;
     Popup = createPopup();
+    Popup.Popup.classList.add("rhPopupLarge");
     Popup.Icon.classList.add(Context ? "fa-question" : "fa-cog");
     NAMWC = {
         User: (User ? User : null)
@@ -4360,7 +4394,7 @@ function addNRFButton(Context, User) {
 function setNRFPopup(NRF, NRFButton, User) {
     var Popup;
     Popup = createPopup();
-    Popup.Popup.style.width = "600px";
+    Popup.Popup.classList.add("rhPopupLarge");
     Popup.Icon.classList.add("fa-times");
     Popup.Title.textContent = "Find " + User.Username + "'s not received giveaways:";
     createOptions(Popup.Options, NRF, [{
@@ -4547,6 +4581,7 @@ function addUGDButton(Context, Key, User) {
     );
     UGDButton = Context.lastElementChild;
     Popup = createPopup();
+    Popup.Popup.classList.add("rhPopupLarge");
     Popup.Icon.classList.add("fa-bar-chart");
     Popup.Title.textContent = "Get " + User.Username + "'s " + UGD.Key.toLowerCase() + " giveaways data:";
     createButton(Popup.Button, "fa-bar-chart", "Get Data", "fa-times-circle", "Cancel", function(Callback) {
@@ -5439,8 +5474,10 @@ function addGTSView(GTS) {
         for (I = 0; I < N; ++I) {
             Popout.Popout.insertAdjacentHTML(
                 "beforeEnd",
-                "<div class=\"GTSTemplate\">" + Templates[I].Name +
-                "    <i class=\"fa fa-check-circle GTSApply\" title=\"Apply template.\"></i>" +
+                "<div class=\"GTSTemplate\">" +
+                "    <span class=\"popup__actions GTSApply\">" +
+                "        <a>" + Templates[I].Name + "</a>" +
+                "    </span>" +
                 "    <i class=\"fa fa-trash GTSDelete\" title=\"Delete template.\"></i>" +
                 "</div>");
             setGTSTemplate(Popout.Popout.lastElementChild, Templates[I], GTS);
@@ -5466,7 +5503,7 @@ function setGTSTemplate(GTSTemplate, Template, GTS) {
         document.querySelector("[data-checkbox-value='" + Template.Region + "']").click();
         document.querySelector("[data-checkbox-value='" + Template.Type + "']").click();
         if (Template.Type == "groups") {
-            if (Template.Whitelist) {
+            if (Template.Whitelist == 1) {
                 Context = document.getElementsByClassName("form__group--whitelist")[0];
                 if (!Context.classList.contains("is-selected")) {
                     Context.click();
@@ -5503,14 +5540,16 @@ function setGTSTemplate(GTSTemplate, Template, GTS) {
     });
     GTSTemplate.lastElementChild.addEventListener("click", function() {
         var Templates, I, N;
-        Templates = GM_getValue("Templates");
-        for (I = 0, N = Templates.length; (I < N) && (Templates[I].Name != Template.Name); ++I);
-        Templates.splice(I, 1);
-        GM_setValue("Templates", Templates);
-        if (GTS.Name == Template.Name) {
-            GTS.Name = "";
+        if (window.confirm("Are you sure you want to delete this template?")) {
+            Templates = GM_getValue("Templates");
+            for (I = 0, N = Templates.length; (I < N) && (Templates[I].Name != Template.Name); ++I);
+            Templates.splice(I, 1);
+            GM_setValue("Templates", Templates);
+            if (GTS.Name == Template.Name) {
+                GTS.Name = "";
+            }
+            GTSTemplate.remove();
         }
-        GTSTemplate.remove();
     });
 }
 
@@ -6207,40 +6246,35 @@ function loadGSStatus(Context) {
     });
 }
 
-// Giveaway Groups Popout
+// Giveaway Groups Popup
 
 function addGGPBox(Context) {
-    var URL, GGPButton, GGPBox;
+    var URL, GGPButton, Popup;
     URL = Context.getAttribute("href");
     GGPButton = Context;
     GGPButton.classList.add("GGPButton");
     GGPButton.removeAttribute("href");
-    GGPButton.insertAdjacentHTML("afterEnd", "<span class=\"giveaway__column--group GGPContainer\" href=\"" + URL + "\">" + GGPButton.outerHTML + "</span>");
-    Context = GGPButton.nextElementSibling;
-    GGPButton.remove();
-    GGPButton = Context.firstElementChild;
-    GGPBox = createPopout(Context);
-    GGPBox.Popout.classList.add("GGPBox");
-    GGPBox.customRule = function(Target) {
-        return !GGPButton.contains(Target);
-    };
     GGPButton.addEventListener("click", function() {
-        if (GGPBox.Popout.classList.contains("rhHidden")) {
-            GGPBox.Popout.innerHTML =
+        var GGPPopup;
+        if (Popup) {
+            Popup.popUp();
+        } else {
+            Popup = createPopup();
+            Popup.Icon.classList.add("fa-user");
+            Popup.Title.innerHTML = "<a href=\"" + URL + "\">Giveaway Groups</a>";
+            Popup.OverallProgress.innerHTML =
                 "<i class=\"fa fa-circle-o-notch fa-spin\"></i> " +
                 "<span>Loading giveaway groups...</span>";
-            GGPBox.popOut(GGPButton);
-            getGGPGroups(URL + "/search?page=", 1, GGPBox.Popout, [], function(Groups) {
+            GGPPopup = Popup.popUp();
+            getGGPGroups(URL + "/search?page=", 1, Popup.Progress, [], function(Groups) {
                 var I, N;
-                GGPBox.Popout.innerHTML = "<a class=\"giveaway__heading__name\" href=\"" + URL + "\">Groups</a>";
+                Popup.OverallProgress.innerHTML = "";
                 for (I = 0, N = Groups.length; I < N; ++I) {
-                    GGPBox.Popout.appendChild(Groups[I]);
+                    Popup.Results.appendChild(Groups[I]);
                 }
-                loadEndlessFeatures(GGPBox.Popout);
-                GGPBox.reposition(GGPButton);
+                loadEndlessFeatures(Popup.Results);
+                GGPPopup.reposition();
             });
-        } else {
-            GGPBox.Popout.classList.add("rhHidden");
         }
     });
 }
@@ -14196,7 +14230,7 @@ function addMCBPButton(Context) {
     CommentBox = document.getElementsByClassName(SG ? "comment--submit" : "reply_form")[0];
     if (CommentBox && !CommentBox.classList.contains("is_hidden")) {
         Popup = createPopup();
-        Popup.Popup.style.width = "auto";
+        Popup.Popup.classList.add("rhPopupLarge");
         Popup.Icon.classList.add("fa-comment");
         Popup.Title.textContent = "Add a comment:";
         Popup.TextArea.classList.remove("rhHidden");
@@ -14761,10 +14795,12 @@ function addStyles() {
         "    opacity: 0.5;" +
         "}" +
         ".rhPopup {" +
-        "    max-width: 75%;" +
-        "    min-width: 300px;" +
         "    max-height: 75%;" +
         "    overflow: auto;" +
+        "    min-width: 300px;" +
+        "}" +
+        ".rhPopupLarge {" +
+        "    width: 75%;" +
         "}" +
         ".rhPopupIcon {" +
         "    height: 48px;" +
@@ -14799,9 +14835,9 @@ function addStyles() {
         "    margin: 15px 0;" +
         "}" +
         ".rhPopupResults {" +
-        "    margin: 0 !important;" +
+        "    margin: 0 0 15px;" +
         "}" +
-        ".rhPopupResults >* {" +
+        ".rhPopupResults >:not(:last-child) {" +
         "    margin: 0 0 15px;" +
         "}" +
         ".rhPopupResults .popup__actions, .comment__actions .RMLLink {" +
