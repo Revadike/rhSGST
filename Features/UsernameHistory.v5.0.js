@@ -1,4 +1,4 @@
-if (ESGST.UH) {
+function addUHStyle() {
     GM_addStyle(
         ".UHBox {" +
         "   background-position: center;" +
