@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 5.0.3
+// @version 5.1
 // @downloadURL https://github.com/rafaelgs18/ESGST/raw/master/ESGST.user.js
 // @updateURL https://github.com/rafaelgs18/ESGST/raw/master/ESGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -21,6 +21,7 @@
 // @connect steamcommunity.com
 // @connect api.steampowered.com
 // @require https://github.com/rafaelgs18/ESGST/raw/master/Features/FixedElements.v5.0.1.js
+// @require https://github.com/rafaelgs18/ESGST/raw/master/Features/VisibleAttachedImages.v5.0.js
 // @require https://github.com/rafaelgs18/ESGST/raw/master/Features/UsernameHistory.v5.0.js
 // @require https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js
 // @require https://greasyfork.org/scripts/26575-bpopup/code/bPopup.js?version=169515
@@ -92,6 +93,9 @@ Features = {
         PR_B: {
             Name: "Run in the background and display the points in the title of the tab upon refreshing."
         }
+    },
+    VAI: {
+        Name: "Visible Attached Images"
     },
     AT: {
         Name: "Accurate Timestamp",
@@ -692,6 +696,9 @@ function loadEndlessFeatures(Context) {
         Name: "ASButton",
         Callback: addASButton
     }]);
+    if (ESGST.VAI) {
+        showVAIImages();
+    }
     loadMatchesFeatures(Context, [{
         Check: GM_getValue("GS") && Path.match(/^\/account\/steam\/groups/),
         Query: ".table__row-inner-wrap",
@@ -1903,7 +1910,7 @@ function loadSMMenu(Sidebar, SMButton) {
     SMSyncFrequency = Container.getElementsByClassName("SMSyncFrequency")[0];
     SMLastSync = Container.getElementsByClassName("SMLastSync")[0];
     SMAPIKey = Container.getElementsByClassName("SMAPIKey")[0];
-    SMGeneralFeatures = ["FE", "ES", "GV", "HIR", "AT", "PR"];
+    SMGeneralFeatures = ["FE", "ES", "GV", "HIR", "AT", "PR", "VAI"];
     SMGiveawayFeatures = ["GTS", "SGG", "AGS", "EGF", "ELGB", "GDCBP", "GWC", "GGP", "GWL", "DGN", "UGS", "ER"];
     SMDiscussionFeatures = ["ADOT", "DH", "MPP", "DED"];
     SMCommentingFeatures = ["CH", "CT", "CFH", "MCBP", "MR", "RFI", "RML"];
