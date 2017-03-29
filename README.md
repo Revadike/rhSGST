@@ -31,6 +31,7 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 * [Header Icons Refresher](#header-icons-refresher)
 * [Accurate Timestamp](#accurate-timestamp)
 * [Points Refresher](#points-refresher)
+* [Visible Attached Images](#visible-attached-images)
 
 ## Giveaways
 
@@ -413,6 +414,14 @@ Tested on Microsoft Edge and most of it seems to work fine, but for some reason 
 
 * Updates your points every 60 seconds (only if the tab is active).
 * You can enable an option that runs the refresher in the background and changes the title of the tab when not active.
+
+### Visible Attached Images
+
+`(steamgifts|steamtrades).com/*`
+
+![](http://i.imgur.com/IoZ7JhK.png)
+
+* Shows all attached images by default.
 
 ### Entered Games Highlighter
 
