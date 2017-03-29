@@ -3,7 +3,7 @@
 // @namespace revilheart
 // @author revilheart
 // @description Adds some cool features to SteamGifts.
-// @version 5.1
+// @version 5.1.1
 // @downloadURL https://github.com/rafaelgs18/ESGST/raw/master/ESGST.user.js
 // @updateURL https://github.com/rafaelgs18/ESGST/raw/master/ESGST.meta.js
 // @match https://www.steamgifts.com/*
@@ -21,7 +21,7 @@
 // @connect steamcommunity.com
 // @connect api.steampowered.com
 // @require https://github.com/rafaelgs18/ESGST/raw/master/Features/FixedElements.v5.0.1.js
-// @require https://github.com/rafaelgs18/ESGST/raw/master/Features/VisibleAttachedImages.v5.0.js
+// @require https://github.com/rafaelgs18/ESGST/raw/master/Features/VisibleAttachedImages.v5.0.1.js
 // @require https://github.com/rafaelgs18/ESGST/raw/master/Features/UsernameHistory.v5.0.js
 // @require https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js
 // @require https://greasyfork.org/scripts/26575-bpopup/code/bPopup.js?version=169515
@@ -697,7 +697,7 @@ function loadEndlessFeatures(Context) {
         Callback: addASButton
     }]);
     if (ESGST.VAI) {
-        showVAIImages();
+        showVAIImages(Context);
     }
     loadMatchesFeatures(Context, [{
         Check: GM_getValue("GS") && Path.match(/^\/account\/steam\/groups/),
